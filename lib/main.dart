@@ -146,7 +146,8 @@ class _HomePageState extends State<HomePage> {
             'AppleWebKit/537.36 (KHTML, like Gecko) '
             'Chrome/130.0.0.0 Safari/537.36',
         'Accept':
-            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'text/html,application/xhtml+xml,application/xml;q=0.9,'
+            '*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Referer': 'https://weebcentral.com/',
       },
@@ -339,18 +340,14 @@ class _HomePageState extends State<HomePage> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   const Text(
                     'Paste a WeebCentral series URL.',
                     style: TextStyle(
                       color: Colors.white54,
                     ),
                   ),
-
                   const SizedBox(height: 18),
-
                   TextField(
                     controller: controller,
                     enabled: !isAdding,
@@ -368,9 +365,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 14),
-
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -415,9 +410,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   SizedBox(
                     width: double.infinity,
                     height: 45,
@@ -482,7 +475,6 @@ class _HomePageState extends State<HomePage> {
                       CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 8),
-
                     const Text(
                       'My Library',
                       style: TextStyle(
@@ -490,9 +482,7 @@ class _HomePageState extends State<HomePage> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
                     TextField(
                       onChanged: (value) {
                         setState(() {
@@ -514,9 +504,7 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 20),
-
                     Expanded(
                       child: library.isEmpty
                           ? _EmptyLibrary(
@@ -596,9 +584,7 @@ class _EmptyLibrary extends StatelessWidget {
             size: 64,
             color: Colors.white24,
           ),
-
           const SizedBox(height: 16),
-
           const Text(
             'Your library is empty',
             style: TextStyle(
@@ -606,18 +592,14 @@ class _EmptyLibrary extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-
           const SizedBox(height: 8),
-
           const Text(
             'Add your first manga to get started.',
             style: TextStyle(
               color: Colors.white54,
             ),
           ),
-
           const SizedBox(height: 20),
-
           FilledButton.icon(
             onPressed: onAdd,
             icon: const Icon(Icons.add),
@@ -686,7 +668,6 @@ class MangaCard extends StatelessWidget {
                           ),
                   ),
                 ),
-
                 Positioned(
                   top: 8,
                   right: 8,
@@ -751,9 +732,7 @@ class MangaCard extends StatelessWidget {
             ),
           ),
         ),
-
         const SizedBox(height: 8),
-
         Text(
           manga.title,
           maxLines: 2,
@@ -801,10 +780,10 @@ class _MangaDetailPageState
     });
 
     try {
-      final seriesUrl = widget.manga.url.replaceAll(
-        RegExp(r'/$'),
-        '',
-      );
+      // Construimos la URL usando únicamente el ID,
+      // exactamente como lo hace PlayTorrio.
+      final seriesUrl =
+          'https://weebcentral.com/series/${widget.manga.id}';
 
       final chaptersUrl =
           '$seriesUrl/full-chapter-list';
@@ -814,19 +793,16 @@ class _MangaDetailPageState
           'AppleWebKit/537.36 (KHTML, like Gecko) '
           'Chrome/130.0.0.0 Safari/537.36';
 
+      // Mismos headers básicos que utiliza PlayTorrio.
       final headers = {
         'User-Agent': userAgent,
         'Accept':
-            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'text/html,application/xhtml+xml,application/xml;q=0.9,'
+            '*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': '$seriesUrl/',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
       };
 
       // Primero cargamos la página principal de la serie.
-      // Esto evita tratar la lista de capítulos como una
-      // petición completamente independiente.
       final seriesResponse = await http.get(
         Uri.parse(seriesUrl),
         headers: headers,
@@ -834,35 +810,45 @@ class _MangaDetailPageState
 
       if (seriesResponse.statusCode != 200) {
         throw Exception(
-          'WeebCentral respondió HTTP ${seriesResponse.statusCode} al cargar la serie.',
+          'WeebCentral respondió HTTP '
+          '${seriesResponse.statusCode} al cargar la serie.',
         );
       }
 
       // Ahora pedimos la lista completa de capítulos.
-      final response = await http.get(
+      final chaptersResponse = await http.get(
         Uri.parse(chaptersUrl),
-        headers: {
-          ...headers,
-          'Referer': '$seriesUrl/',
-          'HX-Request': 'true',
-          'HX-Current-URL': '$seriesUrl/',
-          'HX-Target': 'chapter-list',
-        },
+        headers: headers,
       );
 
-      if (response.statusCode != 200) {
+      if (chaptersResponse.statusCode != 200) {
+        final bodyPreview = chaptersResponse.body
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+
+        final preview = bodyPreview.length > 500
+            ? bodyPreview.substring(0, 500)
+            : bodyPreview;
+
         throw Exception(
-          'WeebCentral respondió HTTP ${response.statusCode} al cargar los capítulos.',
+          'HTTP ${chaptersResponse.statusCode}\n'
+          'URL: $chaptersUrl\n'
+          'Tamaño de respuesta: '
+          '${chaptersResponse.bodyBytes.length} bytes\n\n'
+          'Respuesta:\n$preview',
         );
       }
 
-      final document = parser.parse(response.body);
+      final document = parser.parse(
+        chaptersResponse.body,
+      );
 
       final found = <ChapterItem>[];
       final seen = <String>{};
 
-      for (final element
-          in document.querySelectorAll('a[href*="/chapters/"]')) {
+      for (final element in document.querySelectorAll(
+        'a[href*="/chapters/"]',
+      )) {
         final href = element.attributes['href'];
 
         if (href == null || href.trim().isEmpty) {
@@ -896,17 +882,16 @@ class _MangaDetailPageState
 
         seen.add(chapterId);
 
-        // WeebCentral actualmente coloca el número
-        // dentro de un span dentro del enlace.
         final titleSpan = element.querySelector(
           '.grow span',
         );
 
-        final rawText = (titleSpan?.text.isNotEmpty == true
-                ? titleSpan!.text
-                : element.text)
-            .replaceAll(RegExp(r'\s+'), ' ')
-            .trim();
+        final rawText =
+            (titleSpan?.text.isNotEmpty == true
+                    ? titleSpan!.text
+                    : element.text)
+                .replaceAll(RegExp(r'\s+'), ' ')
+                .trim();
 
         final numberMatch = RegExp(
           r'(\d+(?:\.\d+)?)',
@@ -1005,9 +990,7 @@ class _MangaDetailPageState
                         ),
                 ),
               ),
-
               const SizedBox(height: 24),
-
               Text(
                 widget.manga.title,
                 style: const TextStyle(
@@ -1015,9 +998,7 @@ class _MangaDetailPageState
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 22),
-
               Row(
                 children: [
                   const Text(
@@ -1053,9 +1034,7 @@ class _MangaDetailPageState
                     ),
                 ],
               ),
-
               const SizedBox(height: 12),
-
               if (loadingChapters)
                 Container(
                   padding:
@@ -1192,7 +1171,8 @@ class _MangaDetailPageState
                                       .withOpacity(0.12),
                                   borderRadius:
                                       BorderRadius.circular(
-                                          10),
+                                    10,
+                                  ),
                                 ),
                                 child: const Icon(
                                   Icons.menu_book_outlined,
@@ -1200,11 +1180,9 @@ class _MangaDetailPageState
                                   color: tomoPink,
                                 ),
                               ),
-
                               const SizedBox(
                                 width: 13,
                               ),
-
                               Expanded(
                                 child: Text(
                                   chapter.title,
@@ -1215,7 +1193,6 @@ class _MangaDetailPageState
                                   ),
                                 ),
                               ),
-
                               const Icon(
                                 Icons.chevron_right,
                                 color:
