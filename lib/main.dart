@@ -445,8 +445,10 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        titleSpacing: 16,
         title: RichText(
           text: const TextSpan(
+            style: TextStyle(fontSize: 26),
             children: [
               TextSpan(
                 text: 'TOM',
@@ -473,7 +475,7 @@ class _HomePageState extends State<HomePage> {
             icon: const Icon(Icons.add),
             tooltip: 'Add manga',
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
         ],
       ),
       body: loading
@@ -536,6 +538,7 @@ class _HomePageState extends State<HomePage> {
                                   ),
                                 )
                               : GridView.builder(
+                                  cacheExtent: 500,
                                   padding:
                                       const EdgeInsets.only(
                                     bottom: 24,
@@ -555,8 +558,8 @@ class _HomePageState extends State<HomePage> {
 
                                     return MangaCard(
                                       manga: manga,
-                                      onTap: () {
-                                        Navigator.push(
+                                      onTap: () async {
+                                        await Navigator.push(
                                           context,
                                           MaterialPageRoute(
                                             builder: (_) =>
@@ -565,6 +568,7 @@ class _HomePageState extends State<HomePage> {
                                             ),
                                           ),
                                         );
+                                        setState(() {});
                                       },
                                       onRemove: () {
                                         removeManga(manga);
@@ -979,6 +983,9 @@ class _MangaDetailPageState
 
   @override
   Widget build(BuildContext context) {
+    final readCount = chapters.where((c) => readChapters.contains(c.id)).length;
+    final totalCount = chapters.length;
+
     return Scaffold(
       backgroundColor: tomoBackground,
       appBar: AppBar(
@@ -991,6 +998,7 @@ class _MangaDetailPageState
           backgroundColor: tomoCard,
           onRefresh: loadChapters,
           child: ListView(
+            cacheExtent: 500,
             padding: const EdgeInsets.fromLTRB(
               20,
               8,
@@ -1044,8 +1052,8 @@ class _MangaDetailPageState
                       width: double.infinity,
                       height: 50,
                       child: FilledButton.icon(
-                        onPressed: () {
-                          Navigator.push(
+                        onPressed: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => MangaReaderPage(
@@ -1055,6 +1063,7 @@ class _MangaDetailPageState
                               ),
                             ),
                           );
+                          await _loadProgress();
                         },
                         icon: const Icon(
                           Icons.play_arrow_rounded,
@@ -1076,6 +1085,7 @@ class _MangaDetailPageState
                 ),
               const SizedBox(height: 22),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
                     'Chapters',
@@ -1084,32 +1094,67 @@ class _MangaDetailPageState
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  if (!loadingChapters &&
-                      chapterError == null)
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: tomoPink.withOpacity(0.15),
-                        borderRadius:
-                            BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        '${chapters.length}',
-                        style: const TextStyle(
-                          color: tomoPink,
-                          fontSize: 12,
-                          fontWeight:
-                              FontWeight.bold,
-                        ),
+                  if (!loadingChapters && chapterError == null && totalCount > 0)
+                    Text(
+                      '$readCount de $totalCount leídos',
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                 ],
               ),
+              const SizedBox(height: 12),
+              if (!loadingChapters &&
+                  chapterError == null &&
+                  totalCount > 0)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 13),
+                  decoration: BoxDecoration(
+                    color: tomoCard,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Progreso',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white70,
+                            ),
+                          ),
+                          Text(
+                            '$readCount de $totalCount leídos',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white54,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 9),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: totalCount == 0
+                              ? 0
+                              : readCount / totalCount,
+                          minHeight: 7,
+                          backgroundColor: Colors.white10,
+                          valueColor:
+                              const AlwaysStoppedAnimation<Color>(tomoPink),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 12),
               if (loadingChapters)
                 Container(
@@ -1209,6 +1254,7 @@ class _MangaDetailPageState
                         BorderRadius.circular(18),
                   ),
                   child: ListView.separated(
+                    cacheExtent: 500,
                     shrinkWrap: true,
                     physics:
                         const NeverScrollableScrollPhysics(),
@@ -1226,8 +1272,8 @@ class _MangaDetailPageState
                           readChapters.contains(chapter.id);
 
                       return InkWell(
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) =>
@@ -1238,6 +1284,7 @@ class _MangaDetailPageState
                               ),
                             ),
                           );
+                          await _loadProgress();
                         },
                         borderRadius:
                             BorderRadius.circular(18),
@@ -1372,10 +1419,6 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
     return _prefs ??= await SharedPreferences.getInstance();
   }
 
-  // ==========================================================
-  // PROGRESO
-  // ==========================================================
-
   Future<void> _loadProgressAndChapter() async {
     final prefs = await _preferences;
     final savedRead = prefs.getStringList(_readKey) ?? <String>[];
@@ -1420,8 +1463,6 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
   }
 
   Future<void> _markChapterAsRead(String chapterId) async {
-    if (readChapters.contains(chapterId)) return;
-
     final updated = <String>{...readChapters, chapterId};
     readChapters = updated;
 
@@ -1433,10 +1474,6 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
 
     if (mounted) setState(() {});
   }
-
-  // ==========================================================
-  // CARGA DEL CAPÍTULO
-  // ==========================================================
 
   Future<void> loadImages({int initialPage = 0}) async {
     if (mounted) {
@@ -1542,8 +1579,6 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
   void _precacheNearbyPages(int page) {
     if (!mounted || images.isEmpty) return;
 
-    // Solo precargamos las páginas inmediatas. Esto evita descargar
-    // medio capítulo de golpe y hace que los cambios se sientan instantáneos.
     final candidates = <int>{
       page + 1,
       page + 2,
@@ -1560,10 +1595,6 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
     }
   }
 
-  // ==========================================================
-  // PÁGINAS
-  // ==========================================================
-
   void goToPage(int page) {
     if (page < 0 ||
         page >= images.length ||
@@ -1577,10 +1608,6 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
       curve: Curves.easeOut,
     );
   }
-
-  // ==========================================================
-  // CAPÍTULOS
-  // ==========================================================
 
   int get _activeChapterIndex {
     return widget.chapters.indexWhere(
@@ -1637,10 +1664,6 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
     await _markChapterAsRead(activeChapter.id);
     await _openChapter(chapter);
   }
-
-  // ==========================================================
-  // LISTA DE CAPÍTULOS
-  // ==========================================================
 
   void _showChapterList() {
     if (widget.chapters.isEmpty) return;
@@ -1700,6 +1723,7 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
                 ),
                 Expanded(
                   child: ListView.separated(
+                    cacheExtent: 500,
                     padding: const EdgeInsets.fromLTRB(
                       12,
                       8,
@@ -1805,10 +1829,6 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
     );
   }
 
-  // ==========================================================
-  // BUILD
-  // ==========================================================
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1902,6 +1922,11 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
 
             _scheduleSaveProgress();
             _precacheNearbyPages(index);
+
+            // Llegar a la última página significa que el capítulo terminó.
+            if (index == images.length - 1) {
+              _markChapterAsRead(activeChapter.id);
+            }
           },
           itemBuilder: (context, index) {
             final cacheWidth =
@@ -1957,10 +1982,13 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
                 'Página ${currentPage + 1} de ${images.length}',
             onPrevious: currentPage > 0
                 ? () => goToPage(currentPage - 1)
-                : null,
+                : (_previousChapter != null ? _goToPreviousChapter : null),
             onNext: currentPage < images.length - 1
                 ? () => goToPage(currentPage + 1)
-                : null,
+                : (_nextChapter != null ? _goToNextChapter : null),
+            isChapterBoundary: currentPage == 0 || currentPage == images.length - 1,
+            previousChapterTitle: _previousChapter?.title,
+            nextChapterTitle: _nextChapter?.title,
           ),
         ),
       ],
@@ -1974,6 +2002,9 @@ class _ReaderControls extends StatelessWidget {
   final String centerText;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
+  final bool isChapterBoundary;
+  final String? previousChapterTitle;
+  final String? nextChapterTitle;
 
   const _ReaderControls({
     required this.leftLabel,
@@ -1981,6 +2012,9 @@ class _ReaderControls extends StatelessWidget {
     required this.centerText,
     required this.onPrevious,
     required this.onNext,
+    this.isChapterBoundary = false,
+    this.previousChapterTitle,
+    this.nextChapterTitle,
   });
 
   @override
@@ -2006,7 +2040,6 @@ class _ReaderControls extends StatelessWidget {
                 ? Colors.white12
                 : Colors.white,
           ),
-
           Expanded(
             child: Center(
               child: Text(
@@ -2020,7 +2053,6 @@ class _ReaderControls extends StatelessWidget {
               ),
             ),
           ),
-
           IconButton(
             onPressed: onNext,
             tooltip: rightLabel,
