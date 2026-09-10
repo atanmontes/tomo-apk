@@ -222,7 +222,7 @@ class _HomePageState extends State<HomePage> {
                     keyboardType: TextInputType.url,
                     decoration: InputDecoration(
                       hintText:
-                          'https://weebcentral.com/series/...',
+                          '[https://weebcentral.com/series/](https://weebcentral.com/series/)...',
                       filled: true,
                       fillColor: tomoBackground,
                       border: OutlineInputBorder(
@@ -314,13 +314,13 @@ class _HomePageState extends State<HomePage> {
         titleSpacing: 16,
         title: RichText(
           text: const TextSpan(
-            style: TextStyle(fontSize: 26),
+            style: TextStyle(fontSize: 38),
             children: [
               TextSpan(
                 text: 'TOM',
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
-                  letterSpacing: -1.2,
+                  letterSpacing: -1.5,
                   color: Colors.white,
                 ),
               ),
@@ -328,7 +328,7 @@ class _HomePageState extends State<HomePage> {
                 text: 'O',
                 style: TextStyle(
                   fontWeight: FontWeight.w900,
-                  letterSpacing: -1.2,
+                  letterSpacing: -1.5,
                   color: tomoPink,
                 ),
               ),
@@ -358,12 +358,13 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment:
                       CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     const Text(
                       'My Library',
                       style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white70,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -500,4 +501,3 @@ class _EmptyLibrary extends StatelessWidget {
     );
   }
 }
-

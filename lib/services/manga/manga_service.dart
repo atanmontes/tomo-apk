@@ -26,7 +26,7 @@ class MangaService {
 
     if (response.statusCode != 200) {
       throw Exception(
-        'WeebCentral respondió HTTP ${response.statusCode}',
+        'WeebCentral returned HTTP ${response.statusCode}.',
       );
     }
 
@@ -58,7 +58,7 @@ class MangaService {
     final parts = uri.pathSegments;
 
     if (parts.length < 2 || parts[0] != 'series') {
-      throw Exception('URL de serie inválida.');
+      throw Exception('Invalid series URL.');
     }
 
     final id = parts[1];
@@ -91,8 +91,8 @@ class MangaService {
       throw Exception(
         'HTTP ${response.statusCode}\n'
         'URL: $chaptersUrl\n'
-        'Tamaño de respuesta: ${response.bodyBytes.length} bytes\n\n'
-        'Respuesta:\n$preview',
+        'Response size: ${response.bodyBytes.length} bytes\n\n'
+        'Response:\n$preview',
       );
     }
 
@@ -143,17 +143,11 @@ class MangaService {
               .replaceAll(RegExp(r'\s+'), ' ')
               .trim();
 
-      final numberMatch = RegExp(
-        r'(\d+(?:\.\d+)?)',
-      ).firstMatch(rawText);
-
-      final number = numberMatch?.group(1);
-
-      final title = number != null
-          ? 'Capítulo $number'
-          : rawText.isNotEmpty
-              ? rawText
-              : 'Capítulo';
+      // Preserve the original chapter nomenclature from WeebCentral.
+      // Examples: Chapter, Plot, No., Punch, Tomo, Capítulo, Special, etc.
+      final title = rawText.isNotEmpty
+          ? rawText
+          : 'Chapter';
 
       found.add(
         ChapterItem(
@@ -186,7 +180,7 @@ class MangaService {
 
     if (response.statusCode != 200) {
       throw Exception(
-        'WeebCentral respondió HTTP ${response.statusCode}.',
+        'WeebCentral returned HTTP ${response.statusCode}.',
       );
     }
 
