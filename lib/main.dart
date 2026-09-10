@@ -10,6 +10,20 @@ const Color tomoPink = Color(0xFFEC4899);
 const Color tomoBackground = Color(0xFF09090B);
 const Color tomoCard = Color(0xFF18181B);
 
+const String tomoUserAgent =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+    'AppleWebKit/537.36 (KHTML, like Gecko) '
+    'Chrome/130.0.0.0 Safari/537.36';
+
+final http.Client tomoHttpClient = http.Client();
+
+Map<String, String> get tomoHeaders => const {
+  'User-Agent': tomoUserAgent,
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Referer': 'https://weebcentral.com/',
+};
+
 class MangaItem {
   final String id;
   final String title;
@@ -139,20 +153,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<MangaItem> fetchManga(String url) async {
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-            'AppleWebKit/537.36 (KHTML, like Gecko) '
-            'Chrome/130.0.0.0 Safari/537.36',
-        'Accept':
-            'text/html,application/xhtml+xml,application/xml;q=0.9,'
-            '*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://weebcentral.com/',
-      },
-    );
+    final response = await tomoHttpClient
+        .get(Uri.parse(url), headers: tomoHeaders)
+        .timeout(const Duration(seconds: 15));
 
     if (response.statusCode != 200) {
       throw Exception(
@@ -556,23 +559,25 @@ class _HomePageState extends State<HomePage> {
                                     final manga =
                                         mangas[index];
 
-                                    return MangaCard(
-                                      manga: manga,
-                                      onTap: () async {
-                                        await Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) =>
-                                                MangaDetailPage(
-                                              manga: manga,
+                                    return RepaintBoundary(
+                                      child: MangaCard(
+                                        manga: manga,
+                                        onTap: () async {
+                                          await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  MangaDetailPage(
+                                                manga: manga,
+                                              ),
                                             ),
-                                          ),
-                                        );
-                                        setState(() {});
-                                      },
-                                      onRemove: () {
-                                        removeManga(manga);
-                                      },
+                                          );
+                                          setState(() {});
+                                        },
+                                        onRemove: () {
+                                          removeManga(manga);
+                                        },
+                                      ),
                                     );
                                   },
                                 ),
@@ -675,6 +680,12 @@ class MangaCard extends StatelessWidget {
                             width: double.infinity,
                             height: double.infinity,
                             fit: BoxFit.cover,
+                            cacheWidth: (MediaQuery.sizeOf(context).width / 2 *
+                                    MediaQuery.devicePixelRatioOf(context) *
+                                    1.1)
+                                .round(),
+                            filterQuality: FilterQuality.low,
+                            gaplessPlayback: true,
                             errorBuilder: (_, __, ___) {
                               return Container(
                                 color: tomoCard,
@@ -820,41 +831,12 @@ class _MangaDetailPageState
     });
 
     try {
-      final seriesUrl =
-          'https://weebcentral.com/series/${widget.manga.id}';
-
       final chaptersUrl =
-          '$seriesUrl/full-chapter-list';
+          'https://weebcentral.com/series/${widget.manga.id}/full-chapter-list';
 
-      const userAgent =
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-          'AppleWebKit/537.36 (KHTML, like Gecko) '
-          'Chrome/130.0.0.0 Safari/537.36';
-
-      final headers = {
-        'User-Agent': userAgent,
-        'Accept':
-            'text/html,application/xhtml+xml,application/xml;q=0.9,'
-            '*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      };
-
-      final seriesResponse = await http.get(
-        Uri.parse(seriesUrl),
-        headers: headers,
-      );
-
-      if (seriesResponse.statusCode != 200) {
-        throw Exception(
-          'WeebCentral respondió HTTP '
-          '${seriesResponse.statusCode} al cargar la serie.',
-        );
-      }
-
-      final chaptersResponse = await http.get(
-        Uri.parse(chaptersUrl),
-        headers: headers,
-      );
+      final chaptersResponse = await tomoHttpClient
+          .get(Uri.parse(chaptersUrl), headers: tomoHeaders)
+          .timeout(const Duration(seconds: 15));
 
       if (chaptersResponse.statusCode != 200) {
         final bodyPreview = chaptersResponse.body
@@ -1026,6 +1008,12 @@ class _MangaDetailPageState
                           width: 180,
                           height: 260,
                           fit: BoxFit.cover,
+                          cacheWidth: (180 *
+                                  MediaQuery.devicePixelRatioOf(context) *
+                                  1.15)
+                              .round(),
+                          filterQuality: FilterQuality.low,
+                          gaplessPlayback: true,
                         ),
                 ),
               ),
@@ -1094,15 +1082,6 @@ class _MangaDetailPageState
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  if (!loadingChapters && chapterError == null && totalCount > 0)
-                    Text(
-                      '$readCount de $totalCount leídos',
-                      style: const TextStyle(
-                        color: Colors.white54,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -1122,7 +1101,7 @@ class _MangaDetailPageState
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
-                            'Progreso',
+                            'Progress',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -1130,7 +1109,7 @@ class _MangaDetailPageState
                             ),
                           ),
                           Text(
-                            '$readCount de $totalCount leídos',
+                            '$readCount of $totalCount read',
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -1484,11 +1463,6 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
     }
 
     try {
-      const userAgent =
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-          'AppleWebKit/537.36 (KHTML, like Gecko) '
-          'Chrome/130.0.0.0 Safari/537.36';
-
       final url =
           'https://weebcentral.com/chapters/'
           '${activeChapter.id}'
@@ -1496,17 +1470,9 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
           '&current_page=1'
           '&reading_style=long_strip';
 
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'User-Agent': userAgent,
-          'Accept':
-              'text/html,application/xhtml+xml,application/xml;q=0.9,'
-              '*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://weebcentral.com/',
-        },
-      );
+      final response = await tomoHttpClient
+          .get(Uri.parse(url), headers: tomoHeaders)
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode != 200) {
         throw Exception(
@@ -1579,19 +1545,27 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
   void _precacheNearbyPages(int page) {
     if (!mounted || images.isEmpty) return;
 
-    final candidates = <int>{
-      page + 1,
-      page + 2,
-      page - 1,
-    };
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final cacheWidth = (screenWidth * pixelRatio * 1.25).round();
+
+    // Prioriza la siguiente página para que el gesto de pasar se sienta inmediato.
+    final candidates = <int>{page + 1};
+
+    // También deja lista la anterior cuando ya estamos más avanzados.
+    if (page > 0) {
+      candidates.add(page - 1);
+    }
 
     for (final index in candidates) {
       if (index < 0 || index >= images.length) continue;
 
-      precacheImage(
+      final provider = ResizeImage(
         NetworkImage(images[index]),
-        context,
+        width: cacheWidth,
       );
+
+      precacheImage(provider, context);
     }
   }
 
@@ -1909,10 +1883,11 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
   Widget _buildPageMode() {
     return Stack(
       children: [
-        PageView.builder(
-          controller: pageController,
-          itemCount: images.length,
-          allowImplicitScrolling: true,
+        Center(
+          child: PageView.builder(
+            controller: pageController,
+            itemCount: images.length,
+            allowImplicitScrolling: true,
           onPageChanged: (index) {
             if (currentPage == index) return;
 
@@ -1947,9 +1922,11 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
                   cacheWidth: cacheWidth,
                   filterQuality: FilterQuality.low,
                   gaplessPlayback: true,
-                  loadingBuilder:
-                      (context, child, progress) {
-                    if (progress == null) return child;
+                  frameBuilder:
+                      (context, child, frame, wasSynchronouslyLoaded) {
+                    if (wasSynchronouslyLoaded || frame != null) {
+                      return child;
+                    }
 
                     return const Center(
                       child: CircularProgressIndicator(
@@ -1970,6 +1947,7 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
               ),
             );
           },
+        ),
         ),
         Positioned(
           left: 16,
@@ -2020,7 +1998,7 @@ class _ReaderControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 58,
+      height: 64,
       decoration: BoxDecoration(
         color: tomoCard.withOpacity(0.96),
         borderRadius: BorderRadius.circular(16),
@@ -2030,15 +2008,21 @@ class _ReaderControls extends StatelessWidget {
       ),
       child: Row(
         children: [
-          IconButton(
-            onPressed: onPrevious,
-            tooltip: leftLabel,
-            icon: const Icon(
-              Icons.chevron_left,
+          SizedBox(
+            width: 68,
+            height: 64,
+            child: IconButton(
+              onPressed: onPrevious,
+              tooltip: leftLabel,
+              iconSize: 36,
+              padding: EdgeInsets.zero,
+              icon: const Icon(
+                Icons.chevron_left,
+              ),
+              color: onPrevious == null
+                  ? Colors.white12
+                  : Colors.white,
             ),
-            color: onPrevious == null
-                ? Colors.white12
-                : Colors.white,
           ),
           Expanded(
             child: Center(
@@ -2053,15 +2037,21 @@ class _ReaderControls extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            onPressed: onNext,
-            tooltip: rightLabel,
-            icon: const Icon(
-              Icons.chevron_right,
+          SizedBox(
+            width: 68,
+            height: 64,
+            child: IconButton(
+              onPressed: onNext,
+              tooltip: rightLabel,
+              iconSize: 36,
+              padding: EdgeInsets.zero,
+              icon: const Icon(
+                Icons.chevron_right,
+              ),
+              color: onNext == null
+                  ? Colors.white12
+                  : Colors.white,
             ),
-            color: onNext == null
-                ? Colors.white12
-                : Colors.white,
           ),
         ],
       ),
