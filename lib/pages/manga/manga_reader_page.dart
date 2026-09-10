@@ -426,7 +426,7 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
         Positioned(
           left: 16,
           right: 16,
-          bottom: 62,
+          bottom: 80,
           child: _ReaderControls(
             leftLabel: 'Anterior',
             rightLabel: 'Siguiente',
