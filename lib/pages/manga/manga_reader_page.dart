@@ -482,15 +482,23 @@ class _ReaderControls extends StatelessWidget {
       ),
       child: Row(
         children: [
-          IconButton(
-            onPressed: onPrevious,
-            tooltip: leftLabel,
-            icon: const Icon(
-              Icons.chevron_left,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 30),
+            child: IconButton(
+              onPressed: onPrevious,
+              tooltip: leftLabel,
+              constraints: const BoxConstraints(
+                minWidth: 64,
+                minHeight: 58,
+              ),
+              padding: EdgeInsets.zero,
+              icon: const Icon(
+                Icons.chevron_left,
+              ),
+              color: onPrevious == null
+                  ? Colors.white12
+                  : Colors.white,
             ),
-            color: onPrevious == null
-                ? Colors.white12
-                : Colors.white,
           ),
           Expanded(
             child: Center(
@@ -505,15 +513,23 @@ class _ReaderControls extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            onPressed: onNext,
-            tooltip: rightLabel,
-            icon: const Icon(
-              Icons.chevron_right,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 30),
+            child: IconButton(
+              onPressed: onNext,
+              tooltip: rightLabel,
+              constraints: const BoxConstraints(
+                minWidth: 64,
+                minHeight: 58,
+              ),
+              padding: EdgeInsets.zero,
+              icon: const Icon(
+                Icons.chevron_right,
+              ),
+              color: onNext == null
+                  ? Colors.white12
+                  : Colors.white,
             ),
-            color: onNext == null
-                ? Colors.white12
-                : Colors.white,
           ),
         ],
       ),

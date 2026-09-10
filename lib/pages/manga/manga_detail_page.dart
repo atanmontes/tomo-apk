@@ -62,6 +62,29 @@ class _MangaDetailPageState
     });
   }
 
+  Future<void> _toggleChapterRead(String chapterId) async {
+  final updated = <String>{...readChapters};
+
+  if (updated.contains(chapterId)) {
+    updated.remove(chapterId);
+  } else {
+    updated.add(chapterId);
+  }
+
+  final prefs = await SharedPreferences.getInstance();
+
+  await prefs.setStringList(
+    'tomo_read_${widget.manga.id}',
+    updated.toList(),
+  );
+
+  if (!mounted) return;
+
+  setState(() {
+    readChapters = updated;
+  });
+}
+
   Future<void> loadChapters() async {
     setState(() {
       loadingChapters = true;
@@ -506,18 +529,27 @@ class _MangaDetailPageState
                                     ),
                                   ),
                                 ),
-                                if (isRead)
-                                  const Icon(
-                                    Icons.check_circle,
-                                    color: Colors.white30,
-                                    size: 19,
-                                  )
-                                else
-                                  const Icon(
-                                    Icons.chevron_right,
-                                    color: Colors.white24,
-                                    size: 21,
+                                                                IconButton(
+                                  onPressed: () =>
+                                      _toggleChapterRead(chapter.id),
+                                  tooltip: isRead
+                                      ? 'Marcar como no leído'
+                                      : 'Marcar como leído',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(
+                                    minWidth: 44,
+                                    minHeight: 44,
                                   ),
+                                  icon: Icon(
+                                    isRead
+                                        ? Icons.check_circle
+                                        : Icons.circle_outlined,
+                                    color: isRead
+                                        ? Colors.white30
+                                        : Colors.white24,
+                                    size: 20,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
