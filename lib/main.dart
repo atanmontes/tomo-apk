@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -51,11 +52,6 @@ class ChapterItem {
     required this.title,
     required this.url,
   });
-}
-
-enum ReadingMode {
-  page,
-  strip,
 }
 
 void main() {
@@ -449,11 +445,26 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
-          'TOMO',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.5,
+        title: RichText(
+          text: const TextSpan(
+            children: [
+              TextSpan(
+                text: 'TOM',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1.2,
+                  color: Colors.white,
+                ),
+              ),
+              TextSpan(
+                text: 'O',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -1.2,
+                  color: tomoPink,
+                ),
+              ),
+            ],
           ),
         ),
         actions: [
@@ -772,10 +783,30 @@ class _MangaDetailPageState
   bool loadingChapters = true;
   String? chapterError;
 
+  String? lastChapterId;
+  Set<String> readChapters = <String>{};
+
   @override
   void initState() {
     super.initState();
     loadChapters();
+    _loadProgress();
+  }
+
+  Future<void> _loadProgress() async {
+    final prefs = await SharedPreferences.getInstance();
+    final last = prefs.getString('tomo_last_${widget.manga.id}');
+    final read = prefs.getStringList(
+          'tomo_read_${widget.manga.id}',
+        ) ??
+        <String>[];
+
+    if (!mounted) return;
+
+    setState(() {
+      lastChapterId = last;
+      readChapters = read.toSet();
+    });
   }
 
   Future<void> loadChapters() async {
@@ -998,6 +1029,51 @@ class _MangaDetailPageState
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 18),
+              if (lastChapterId != null &&
+                  chapters.any(
+                    (chapter) => chapter.id == lastChapterId,
+                  ))
+                Builder(
+                  builder: (context) {
+                    final lastChapter = chapters.firstWhere(
+                      (chapter) => chapter.id == lastChapterId,
+                    );
+
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => MangaReaderPage(
+                                manga: widget.manga,
+                                chapter: lastChapter,
+                                chapters: chapters,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.play_arrow_rounded,
+                        ),
+                        label: Text(
+                          'Continuar — ${lastChapter.title}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: tomoPink,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               const SizedBox(height: 22),
               Row(
                 children: [
@@ -1146,6 +1222,8 @@ class _MangaDetailPageState
                         (context, index) {
                       final chapter =
                           chapters[index];
+                      final isRead =
+                          readChapters.contains(chapter.id);
 
                       return InkWell(
                         onTap: () {
@@ -1195,19 +1273,26 @@ class _MangaDetailPageState
                               Expanded(
                                 child: Text(
                                   chapter.title,
-                                  style:
-                                      const TextStyle(
-                                    fontWeight:
-                                        FontWeight.w600,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: isRead
+                                        ? Colors.white54
+                                        : Colors.white,
                                   ),
                                 ),
                               ),
-                              const Icon(
-                                Icons.chevron_right,
-                                color:
-                                    Colors.white24,
-                                size: 21,
-                              ),
+                              if (isRead)
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.white30,
+                                  size: 19,
+                                )
+                              else
+                                const Icon(
+                                  Icons.chevron_right,
+                                  color: Colors.white24,
+                                  size: 21,
+                                ),
                             ],
                           ),
                         ),
@@ -1249,131 +1334,111 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
   static const String _lastPrefix = 'tomo_last_';
 
   List<String> images = [];
-
   bool loading = true;
   String? error;
-
-  ReadingMode readingMode = ReadingMode.page;
   int currentPage = 0;
 
   late ChapterItem activeChapter;
-
   late final PageController pageController;
-  late final ScrollController stripController;
 
-  final Map<int, GlobalKey> imageKeys = {};
-
-  Set<String> readChapters = {};
+  SharedPreferences? _prefs;
+  Set<String> readChapters = <String>{};
+  Timer? _saveTimer;
   bool progressLoading = true;
+
+  String get _readKey => '$_readPrefix${widget.manga.id}';
+
+  String _pageKey(String chapterId) =>
+      '$_pagePrefix${widget.manga.id}_$chapterId';
+
+  String get _lastKey => '$_lastPrefix${widget.manga.id}';
 
   @override
   void initState() {
     super.initState();
-
     activeChapter = widget.chapter;
-
     pageController = PageController();
-    stripController = ScrollController();
-
-    stripController.addListener(_handleStripScroll);
-
     _loadProgressAndChapter();
   }
 
   @override
   void dispose() {
-    stripController.removeListener(_handleStripScroll);
+    _saveTimer?.cancel();
     pageController.dispose();
-    stripController.dispose();
     super.dispose();
+  }
+
+  Future<SharedPreferences> get _preferences async {
+    return _prefs ??= await SharedPreferences.getInstance();
   }
 
   // ==========================================================
   // PROGRESO
   // ==========================================================
 
-  String get _readKey => '$_readPrefix${widget.manga.id}';
-
-  String _pageKey(String chapterId) {
-    return '$_pagePrefix${widget.manga.id}_$chapterId';
-  }
-
-  String get _lastKey => '$_lastPrefix${widget.manga.id}';
-
   Future<void> _loadProgressAndChapter() async {
-    final prefs = await SharedPreferences.getInstance();
-
+    final prefs = await _preferences;
     final savedRead = prefs.getStringList(_readKey) ?? <String>[];
+    final savedPage = prefs.getInt(_pageKey(activeChapter.id)) ?? 0;
 
-    readChapters = savedRead.toSet();
+    if (!mounted) return;
 
-    final savedPage = prefs.getInt(
-      _pageKey(activeChapter.id),
-    );
+    setState(() {
+      readChapters = savedRead.toSet();
+      currentPage = savedPage;
+      progressLoading = false;
+    });
 
-    if (mounted) {
-      setState(() {
-        currentPage = savedPage ?? 0;
-        progressLoading = false;
-      });
-    }
-
-    await prefs.setString(
-      _lastKey,
-      activeChapter.id,
-    );
-
-    await loadImages(
-      initialPage: savedPage ?? 0,
-    );
+    await prefs.setString(_lastKey, activeChapter.id);
+    await loadImages(initialPage: savedPage);
   }
 
-  Future<void> _saveCurrentPage() async {
-    if (images.isEmpty) {
-      return;
-    }
+  void _scheduleSaveProgress() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 250), () async {
+      if (images.isEmpty) return;
 
-    final prefs = await SharedPreferences.getInstance();
+      final prefs = await _preferences;
+      await prefs.setInt(
+        _pageKey(activeChapter.id),
+        currentPage,
+      );
+      await prefs.setString(_lastKey, activeChapter.id);
+    });
+  }
 
+  Future<void> _saveProgressNow() async {
+    _saveTimer?.cancel();
+    if (images.isEmpty) return;
+
+    final prefs = await _preferences;
     await prefs.setInt(
       _pageKey(activeChapter.id),
       currentPage,
     );
-
-    await prefs.setString(
-      _lastKey,
-      activeChapter.id,
-    );
+    await prefs.setString(_lastKey, activeChapter.id);
   }
 
-  Future<void> _markChapterAsRead(
-    String chapterId,
-  ) async {
-    if (readChapters.contains(chapterId)) {
-      return;
-    }
+  Future<void> _markChapterAsRead(String chapterId) async {
+    if (readChapters.contains(chapterId)) return;
 
-    readChapters.add(chapterId);
+    final updated = <String>{...readChapters, chapterId};
+    readChapters = updated;
 
-    final prefs = await SharedPreferences.getInstance();
-
+    final prefs = await _preferences;
     await prefs.setStringList(
       _readKey,
-      readChapters.toList(),
+      updated.toList(),
     );
 
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
   }
 
   // ==========================================================
-  // CARGAR CAPÍTULO
+  // CARGA DEL CAPÍTULO
   // ==========================================================
 
-  Future<void> loadImages({
-    int initialPage = 0,
-  }) async {
+  Future<void> loadImages({int initialPage = 0}) async {
     if (mounted) {
       setState(() {
         loading = true;
@@ -1413,7 +1478,6 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
       }
 
       final document = parser.parse(response.body);
-
       final foundImages = <String>[];
       final seen = <String>{};
 
@@ -1423,9 +1487,7 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
             image.attributes['data-src'] ??
             '';
 
-        if (src.isEmpty) {
-          continue;
-        }
+        if (src.isEmpty) continue;
 
         final imageUrl = Uri.parse(
           'https://weebcentral.com',
@@ -1436,12 +1498,9 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
           continue;
         }
 
-        if (seen.contains(imageUrl)) {
-          continue;
+        if (seen.add(imageUrl)) {
+          foundImages.add(imageUrl);
         }
-
-        seen.add(imageUrl);
-        foundImages.add(imageUrl);
       }
 
       if (foundImages.isEmpty) {
@@ -1455,15 +1514,7 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
         foundImages.length - 1,
       );
 
-      if (!mounted) {
-        return;
-      }
-
-      imageKeys.clear();
-
-      for (int i = 0; i < foundImages.length; i++) {
-        imageKeys[i] = GlobalKey();
-      }
+      if (!mounted) return;
 
       setState(() {
         images = foundImages;
@@ -1473,19 +1524,13 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
       });
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
+        if (!mounted || !pageController.hasClients) return;
 
-        if (readingMode == ReadingMode.page &&
-            pageController.hasClients) {
-          pageController.jumpToPage(safePage);
-        }
+        pageController.jumpToPage(safePage);
+        _precacheNearbyPages(safePage);
       });
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       setState(() {
         loading = false;
@@ -1494,166 +1539,25 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
     }
   }
 
-  // ==========================================================
-  // CAMBIO DE VISTA
-  // ==========================================================
+  void _precacheNearbyPages(int page) {
+    if (!mounted || images.isEmpty) return;
 
-  void toggleReadingMode() {
-    if (images.isEmpty) {
-      return;
-    }
+    // Solo precargamos las páginas inmediatas. Esto evita descargar
+    // medio capítulo de golpe y hace que los cambios se sientan instantáneos.
+    final candidates = <int>{
+      page + 1,
+      page + 2,
+      page - 1,
+    };
 
-    if (readingMode == ReadingMode.strip) {
-      _updateCurrentPageFromStrip();
+    for (final index in candidates) {
+      if (index < 0 || index >= images.length) continue;
 
-      final page = currentPage;
-
-      setState(() {
-        readingMode = ReadingMode.page;
-      });
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !pageController.hasClients) {
-          return;
-        }
-
-        pageController.jumpToPage(
-          page.clamp(0, images.length - 1),
-        );
-      });
-    } else {
-      final page = currentPage;
-
-      setState(() {
-        readingMode = ReadingMode.strip;
-      });
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
-
-        _scrollStripToPage(
-          page.clamp(0, images.length - 1),
-          animate: false,
-        );
-      });
-    }
-  }
-
-  // ==========================================================
-  // DETECCIÓN DE PÁGINA EN TIRA
-  // ==========================================================
-
-  void _handleStripScroll() {
-    if (!mounted || readingMode != ReadingMode.strip) {
-      return;
-    }
-
-    // No hacemos cálculos pesados en cada frame del scroll.
-    // La posición se actualiza al terminar el desplazamiento.
-  }
-
-  void _updateCurrentPageFromStrip() {
-    if (!mounted ||
-        readingMode != ReadingMode.strip ||
-        images.isEmpty) {
-      return;
-    }
-
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final viewportCenter = screenHeight / 2;
-
-    int? closestPage;
-    double closestDistance = double.infinity;
-
-    for (int index = 0; index < images.length; index++) {
-      final key = imageKeys[index];
-
-      if (key == null) {
-        continue;
-      }
-
-      final itemContext = key.currentContext;
-
-      if (itemContext == null) {
-        continue;
-      }
-
-      final renderObject = itemContext.findRenderObject();
-
-      if (renderObject is! RenderBox ||
-          !renderObject.hasSize) {
-        continue;
-      }
-
-      final topLeft = renderObject.localToGlobal(
-        Offset.zero,
+      precacheImage(
+        NetworkImage(images[index]),
+        context,
       );
-
-      final top = topLeft.dy;
-      final bottom = top + renderObject.size.height;
-
-      if (bottom < 0 || top > screenHeight) {
-        continue;
-      }
-
-      final center =
-          top + renderObject.size.height / 2;
-
-      final distance =
-          (center - viewportCenter).abs();
-
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestPage = index;
-      }
     }
-
-    if (closestPage != null &&
-        closestPage != currentPage) {
-      setState(() {
-        currentPage = closestPage!;
-      });
-
-      _saveCurrentPage();
-    }
-  }
-
-  // ==========================================================
-  // POSICIÓN EN TIRA
-  // ==========================================================
-
-  void _scrollStripToPage(
-    int page, {
-    bool animate = true,
-  }) {
-    if (page < 0 || page >= images.length) {
-      return;
-    }
-
-    final key = imageKeys[page];
-
-    if (key == null) {
-      return;
-    }
-
-    final itemContext = key.currentContext;
-
-    if (itemContext == null) {
-      return;
-    }
-
-    Scrollable.ensureVisible(
-      itemContext,
-      duration: animate
-          ? const Duration(milliseconds: 180)
-          : Duration.zero,
-      curve: Curves.easeOut,
-      alignment: 0.05,
-      alignmentPolicy:
-          ScrollPositionAlignmentPolicy.explicit,
-    );
   }
 
   // ==========================================================
@@ -1661,29 +1565,17 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
   // ==========================================================
 
   void goToPage(int page) {
-    if (page < 0 || page >= images.length) {
+    if (page < 0 ||
+        page >= images.length ||
+        !pageController.hasClients) {
       return;
     }
 
-    setState(() {
-      currentPage = page;
-    });
-
-    _saveCurrentPage();
-
-    if (readingMode == ReadingMode.page &&
-        pageController.hasClients) {
-      pageController.animateToPage(
-        page,
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-      );
-    } else if (readingMode == ReadingMode.strip) {
-      _scrollStripToPage(
-        page,
-        animate: true,
-      );
-    }
+    pageController.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 140),
+      curve: Curves.easeOut,
+    );
   }
 
   // ==========================================================
@@ -1698,83 +1590,51 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
 
   ChapterItem? get _previousChapter {
     final index = _activeChapterIndex;
-
-    if (index <= 0) {
-      return null;
-    }
-
+    if (index <= 0) return null;
     return widget.chapters[index - 1];
   }
 
   ChapterItem? get _nextChapter {
     final index = _activeChapterIndex;
-
     if (index < 0 ||
         index >= widget.chapters.length - 1) {
       return null;
     }
-
     return widget.chapters[index + 1];
   }
 
-  Future<void> _openChapter(
-    ChapterItem chapter,
-  ) async {
-    if (chapter.id == activeChapter.id) {
-      return;
-    }
+  Future<void> _openChapter(ChapterItem chapter) async {
+    if (chapter.id == activeChapter.id) return;
 
-    await _saveCurrentPage();
+    await _saveProgressNow();
+    if (!mounted) return;
 
-    if (!mounted) {
-      return;
-    }
+    final prefs = await _preferences;
+    final savedPage = prefs.getInt(_pageKey(chapter.id)) ?? 0;
 
     setState(() {
       activeChapter = chapter;
-      currentPage = 0;
+      currentPage = savedPage;
       images = [];
       loading = true;
       error = null;
     });
 
-    final prefs = await SharedPreferences.getInstance();
-
-    final savedPage = prefs.getInt(
-      _pageKey(chapter.id),
-    );
-
-    await prefs.setString(
-      _lastKey,
-      chapter.id,
-    );
-
-    await loadImages(
-      initialPage: savedPage ?? 0,
-    );
+    await prefs.setString(_lastKey, chapter.id);
+    await loadImages(initialPage: savedPage);
   }
 
   Future<void> _goToPreviousChapter() async {
     final chapter = _previousChapter;
-
-    if (chapter == null) {
-      return;
-    }
-
+    if (chapter == null) return;
     await _openChapter(chapter);
   }
 
   Future<void> _goToNextChapter() async {
     final chapter = _nextChapter;
+    if (chapter == null) return;
 
-    if (chapter == null) {
-      return;
-    }
-
-    await _markChapterAsRead(
-      activeChapter.id,
-    );
-
+    await _markChapterAsRead(activeChapter.id);
     await _openChapter(chapter);
   }
 
@@ -1783,9 +1643,7 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
   // ==========================================================
 
   void _showChapterList() {
-    if (widget.chapters.isEmpty) {
-      return;
-    }
+    if (widget.chapters.isEmpty) return;
 
     final ordered = <ChapterItem>[
       activeChapter,
@@ -1831,19 +1689,15 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
                         onPressed: () {
                           Navigator.pop(sheetContext);
                         },
-                        icon: const Icon(
-                          Icons.close,
-                        ),
+                        icon: const Icon(Icons.close),
                       ),
                     ],
                   ),
                 ),
-
                 const Divider(
                   height: 1,
                   color: Colors.white10,
                 ),
-
                 Expanded(
                   child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(
@@ -1853,8 +1707,7 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
                       20,
                     ),
                     itemCount: ordered.length,
-                    separatorBuilder: (_, __) =>
-                        const Divider(
+                    separatorBuilder: (_, __) => const Divider(
                       height: 1,
                       color: Colors.white10,
                     ),
@@ -1929,8 +1782,7 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
                                   style: TextStyle(
                                     color: tomoPink,
                                     fontSize: 11,
-                                    fontWeight:
-                                        FontWeight.w700,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               )
@@ -1965,16 +1817,13 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
         backgroundColor: Colors.black,
         elevation: 0,
         titleSpacing: 4,
-
         leading: IconButton(
           onPressed: () {
+            _saveProgressNow();
             Navigator.pop(context);
           },
-          icon: const Icon(
-            Icons.arrow_back,
-          ),
+          icon: const Icon(Icons.arrow_back),
         ),
-
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1996,33 +1845,15 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
             ),
           ],
         ),
-
         actions: [
-          if (!loading && images.isNotEmpty)
-            IconButton(
-              onPressed: toggleReadingMode,
-              tooltip: readingMode == ReadingMode.page
-                  ? 'Cambiar a tira'
-                  : 'Cambiar a página',
-              icon: Icon(
-                readingMode == ReadingMode.page
-                    ? Icons.view_agenda_outlined
-                    : Icons.menu_book_outlined,
-              ),
-            ),
-
           IconButton(
             onPressed: _showChapterList,
             tooltip: 'Capítulos',
-            icon: const Icon(
-              Icons.list_alt_outlined,
-            ),
+            icon: const Icon(Icons.list_alt_outlined),
           ),
-
           const SizedBox(width: 4),
         ],
       ),
-
       body: progressLoading
           ? const Center(
               child: CircularProgressIndicator(
@@ -2039,12 +1870,7 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
                   ? _ReaderError(
                       message: error!,
                       onRetry: () {
-                        final savedPage =
-                            currentPage;
-
-                        loadImages(
-                          initialPage: savedPage,
-                        );
+                        loadImages(initialPage: currentPage);
                       },
                     )
                   : images.isEmpty
@@ -2056,16 +1882,9 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
                             ),
                           ),
                         )
-                      : readingMode ==
-                              ReadingMode.page
-                          ? _buildPageMode()
-                          : _buildStripMode(),
+                      : _buildPageMode(),
     );
   }
-
-  // ==========================================================
-  // MODO PÁGINA
-  // ==========================================================
 
   Widget _buildPageMode() {
     return Stack(
@@ -2073,18 +1892,24 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
         PageView.builder(
           controller: pageController,
           itemCount: images.length,
+          allowImplicitScrolling: true,
           onPageChanged: (index) {
-            if (currentPage == index) {
-              return;
-            }
+            if (currentPage == index) return;
 
             setState(() {
               currentPage = index;
             });
 
-            _saveCurrentPage();
+            _scheduleSaveProgress();
+            _precacheNearbyPages(index);
           },
           itemBuilder: (context, index) {
+            final cacheWidth =
+                (MediaQuery.sizeOf(context).width *
+                        MediaQuery.devicePixelRatioOf(context) *
+                        1.25)
+                    .round();
+
             return Center(
               child: InteractiveViewer(
                 minScale: 1,
@@ -2094,15 +1919,15 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
                   fit: BoxFit.contain,
                   width: double.infinity,
                   height: double.infinity,
+                  cacheWidth: cacheWidth,
+                  filterQuality: FilterQuality.low,
+                  gaplessPlayback: true,
                   loadingBuilder:
                       (context, child, progress) {
-                    if (progress == null) {
-                      return child;
-                    }
+                    if (progress == null) return child;
 
                     return const Center(
-                      child:
-                          CircularProgressIndicator(
+                      child: CircularProgressIndicator(
                         color: tomoPink,
                       ),
                     );
@@ -2121,7 +1946,6 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
             );
           },
         ),
-
         Positioned(
           left: 16,
           right: 16,
@@ -2132,109 +1956,14 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
             centerText:
                 'Página ${currentPage + 1} de ${images.length}',
             onPrevious: currentPage > 0
-                ? () => goToPage(
-                      currentPage - 1,
-                    )
+                ? () => goToPage(currentPage - 1)
                 : null,
             onNext: currentPage < images.length - 1
-                ? () => goToPage(
-                      currentPage + 1,
-                    )
+                ? () => goToPage(currentPage + 1)
                 : null,
           ),
         ),
       ],
-    );
-  }
-
-  // ==========================================================
-  // MODO TIRA / VERTICAL
-  // ==========================================================
-
-  Widget _buildStripMode() {
-    return NotificationListener<ScrollNotification>(
-      onNotification: (notification) {
-        if (notification is ScrollEndNotification) {
-          _updateCurrentPageFromStrip();
-        }
-
-        return false;
-      },
-      child: Stack(
-        children: [
-          ListView.builder(
-            controller: stripController,
-            padding: const EdgeInsets.only(
-              bottom: 100,
-            ),
-            itemCount: images.length,
-            itemBuilder: (context, index) {
-              return GestureDetector(
-                onTap: () {
-                  if (currentPage != index) {
-                    setState(() {
-                      currentPage = index;
-                    });
-
-                    _saveCurrentPage();
-                  }
-                },
-                child: Image.network(
-                  images[index],
-                  key: imageKeys[index],
-                  width: double.infinity,
-                  fit: BoxFit.fitWidth,
-                  loadingBuilder:
-                      (context, child, progress) {
-                    if (progress == null) {
-                      return child;
-                    }
-
-                    return const SizedBox(
-                      height: 300,
-                      child: Center(
-                        child:
-                            CircularProgressIndicator(
-                          color: tomoPink,
-                        ),
-                      ),
-                    );
-                  },
-                  errorBuilder: (_, __, ___) {
-                    return const SizedBox(
-                      height: 200,
-                      child: Center(
-                        child: Icon(
-                          Icons.broken_image_outlined,
-                          color: Colors.white24,
-                          size: 45,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 18,
-            child: _ReaderControls(
-              leftLabel: 'Capítulo anterior',
-              rightLabel: 'Capítulo siguiente',
-              centerText: activeChapter.title,
-              onPrevious: _previousChapter != null
-                  ? _goToPreviousChapter
-                  : null,
-              onNext: _nextChapter != null
-                  ? _goToNextChapter
-                  : null,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
