@@ -26,6 +26,7 @@ class MangaReaderPage extends StatefulWidget {
 
 class _MangaReaderPageState extends State<MangaReaderPage> {
   final MangaService _mangaService = MangaService();
+
   static const String _readPrefix = 'tomo_read_';
   static const String _pagePrefix = 'tomo_page_';
   static const String _lastPrefix = 'tomo_last_';
@@ -88,44 +89,68 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
 
   void _scheduleSaveProgress() {
     _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 250), () async {
-      if (images.isEmpty) return;
 
-      final prefs = await _preferences;
-      await prefs.setInt(
-        _pageKey(activeChapter.id),
-        currentPage,
-      );
-      await prefs.setString(_lastKey, activeChapter.id);
-    });
+    _saveTimer = Timer(
+      const Duration(milliseconds: 250),
+      () async {
+        if (images.isEmpty) return;
+
+        final prefs = await _preferences;
+
+        await prefs.setInt(
+          _pageKey(activeChapter.id),
+          currentPage,
+        );
+
+        await prefs.setString(
+          _lastKey,
+          activeChapter.id,
+        );
+      },
+    );
   }
 
   Future<void> _saveProgressNow() async {
     _saveTimer?.cancel();
+
     if (images.isEmpty) return;
 
     final prefs = await _preferences;
+
     await prefs.setInt(
       _pageKey(activeChapter.id),
       currentPage,
     );
-    await prefs.setString(_lastKey, activeChapter.id);
+
+    await prefs.setString(
+      _lastKey,
+      activeChapter.id,
+    );
   }
 
   Future<void> _markChapterAsRead(String chapterId) async {
-    final updated = <String>{...readChapters, chapterId};
+    final updated = <String>{
+      ...readChapters,
+      chapterId,
+    };
+
     readChapters = updated;
 
     final prefs = await _preferences;
+
     await prefs.setStringList(
       _readKey,
       updated.toList(),
     );
 
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+    }
   }
 
-  Future<void> loadImages({int initialPage = 0}) async {
+  Future<void> loadImages({
+    int initialPage = 0,
+  }) async {
     if (!mounted) return;
 
     setState(() {
@@ -134,13 +159,14 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
     });
 
     try {
-      final foundImages = await _mangaService.fetchChapterImages(
+      final foundImages =
+          await _mangaService.fetchChapterImages(
         activeChapter.id,
       );
 
       if (foundImages.isEmpty) {
         throw Exception(
-          'No se encontraron páginas en este capítulo.',
+          'No pages found in this chapter.',
         );
       }
 
@@ -159,7 +185,9 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
       });
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || !pageController.hasClients) return;
+        if (!mounted || !pageController.hasClients) {
+          return;
+        }
 
         pageController.jumpToPage(safePage);
         _precacheNearbyPages(safePage);
@@ -178,19 +206,24 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
     if (!mounted || images.isEmpty) return;
 
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final pixelRatio = MediaQuery.devicePixelRatioOf(context);
-    final cacheWidth = (screenWidth * pixelRatio * 1.25).round();
+    final pixelRatio =
+        MediaQuery.devicePixelRatioOf(context);
 
-    // Prioriza la siguiente página para que el gesto de pasar se sienta inmediato.
+    final cacheWidth =
+        (screenWidth * pixelRatio * 1.25).round();
+
+    // Prioritize the next page so navigation feels immediate.
     final candidates = <int>{page + 1};
 
-    // También deja lista la anterior cuando ya estamos más avanzados.
+    // Also preload the previous page once we are further ahead.
     if (page > 0) {
       candidates.add(page - 1);
     }
 
     for (final index in candidates) {
-      if (index < 0 || index >= images.length) continue;
+      if (index < 0 || index >= images.length) {
+        continue;
+      }
 
       final provider = ResizeImage(
         NetworkImage(images[index]),
@@ -223,27 +256,36 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
 
   ChapterItem? get _previousChapter {
     final index = _activeChapterIndex;
+
     if (index <= 0) return null;
+
     return widget.chapters[index - 1];
   }
 
   ChapterItem? get _nextChapter {
     final index = _activeChapterIndex;
+
     if (index < 0 ||
         index >= widget.chapters.length - 1) {
       return null;
     }
+
     return widget.chapters[index + 1];
   }
 
-  Future<void> _openChapter(ChapterItem chapter) async {
+  Future<void> _openChapter(
+    ChapterItem chapter,
+  ) async {
     if (chapter.id == activeChapter.id) return;
 
     await _saveProgressNow();
+
     if (!mounted) return;
 
     final prefs = await _preferences;
-    final savedPage = prefs.getInt(_pageKey(chapter.id)) ?? 0;
+
+    final savedPage =
+        prefs.getInt(_pageKey(chapter.id)) ?? 0;
 
     setState(() {
       activeChapter = chapter;
@@ -253,24 +295,35 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
       error = null;
     });
 
-    await prefs.setString(_lastKey, chapter.id);
-    await loadImages(initialPage: savedPage);
+    await prefs.setString(
+      _lastKey,
+      chapter.id,
+    );
+
+    await loadImages(
+      initialPage: savedPage,
+    );
   }
 
   Future<void> _goToPreviousChapter() async {
     final chapter = _previousChapter;
+
     if (chapter == null) return;
+
     await _openChapter(chapter);
   }
 
   Future<void> _goToNextChapter() async {
     final chapter = _nextChapter;
+
     if (chapter == null) return;
 
-    await _markChapterAsRead(activeChapter.id);
+    await _markChapterAsRead(
+      activeChapter.id,
+    );
+
     await _openChapter(chapter);
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +341,8 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
           icon: const Icon(Icons.arrow_back),
         ),
         title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
           children: [
             Text(
               widget.manga.title,
@@ -314,8 +368,10 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
               _saveProgressNow();
               Navigator.pop(context);
             },
-            tooltip: 'Volver a capítulos',
-            icon: const Icon(Icons.list_alt_outlined),
+            tooltip: 'Back to chapters',
+            icon: const Icon(
+              Icons.list_alt_outlined,
+            ),
           ),
           const SizedBox(width: 4),
         ],
@@ -336,7 +392,9 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
                   ? _ReaderError(
                       message: error!,
                       onRetry: () {
-                        loadImages(initialPage: currentPage);
+                        loadImages(
+                          initialPage: currentPage,
+                        );
                       },
                     )
                   : images.isEmpty
@@ -356,91 +414,118 @@ class _MangaReaderPageState extends State<MangaReaderPage> {
     return Stack(
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 88),
+          padding: const EdgeInsets.only(
+            bottom: 88,
+          ),
           child: PageView.builder(
             controller: pageController,
             itemCount: images.length,
-            physics: const NeverScrollableScrollPhysics(),
+            physics:
+                const NeverScrollableScrollPhysics(),
             allowImplicitScrolling: true,
-          onPageChanged: (index) {
-            if (currentPage == index) return;
+            onPageChanged: (index) {
+              if (currentPage == index) return;
 
-            setState(() {
-              currentPage = index;
-            });
+              setState(() {
+                currentPage = index;
+              });
 
-            _scheduleSaveProgress();
-            _precacheNearbyPages(index);
+              _scheduleSaveProgress();
+              _precacheNearbyPages(index);
 
-            // Llegar a la última página significa que el capítulo terminó.
-            if (index == images.length - 1) {
-              _markChapterAsRead(activeChapter.id);
-            }
-          },
-          itemBuilder: (context, index) {
-            final cacheWidth =
-                (MediaQuery.sizeOf(context).width *
-                        MediaQuery.devicePixelRatioOf(context) *
-                        1.25)
-                    .round();
+              // Reaching the last page means the chapter is finished.
+              if (index == images.length - 1) {
+                _markChapterAsRead(
+                  activeChapter.id,
+                );
+              }
+            },
+            itemBuilder: (context, index) {
+              final cacheWidth =
+                  (MediaQuery.sizeOf(context).width *
+                          MediaQuery.devicePixelRatioOf(
+                            context,
+                          ) *
+                          1.25)
+                      .round();
 
-            return Center(
-              child: InteractiveViewer(
-                minScale: 1,
-                maxScale: 4,
-                child: Image.network(
-                  images[index],
-                  fit: BoxFit.contain,
-                  width: double.infinity,
-                  height: double.infinity,
-                  cacheWidth: cacheWidth,
-                  filterQuality: FilterQuality.low,
-                  gaplessPlayback: true,
-                  frameBuilder:
-                      (context, child, frame, wasSynchronouslyLoaded) {
-                    if (wasSynchronouslyLoaded || frame != null) {
-                      return child;
-                    }
+              return Center(
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 4,
+                  child: Image.network(
+                    images[index],
+                    fit: BoxFit.contain,
+                    width: double.infinity,
+                    height: double.infinity,
+                    cacheWidth: cacheWidth,
+                    filterQuality: FilterQuality.low,
+                    gaplessPlayback: true,
+                    frameBuilder: (
+                      context,
+                      child,
+                      frame,
+                      wasSynchronouslyLoaded,
+                    ) {
+                      if (wasSynchronouslyLoaded ||
+                          frame != null) {
+                        return child;
+                      }
 
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: tomoPink,
-                      ),
-                    );
-                  },
-                  errorBuilder: (_, __, ___) {
-                    return const Center(
-                      child: Icon(
-                        Icons.broken_image_outlined,
-                        color: Colors.white24,
-                        size: 50,
-                      ),
-                    );
-                  },
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: tomoPink,
+                        ),
+                      );
+                    },
+                    errorBuilder: (_, __, ___) {
+                      return const Center(
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: Colors.white24,
+                          size: 50,
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
-            );
+              );
             },
           ),
         ),
         Positioned(
-          left: 16,
-          right: 16,
+          left: 0,
+          right: 0,
           bottom: 80,
-          child: _ReaderControls(
-            leftLabel: 'Anterior',
-            rightLabel: 'Siguiente',
-            centerText:
-                'Página ${currentPage + 1} de ${images.length}',
-            onPrevious: currentPage > 0
-                ? () => goToPage(currentPage - 1)
-                : (_previousChapter != null ? _goToPreviousChapter : null),
-            onNext: currentPage < images.length - 1
-                ? () => goToPage(currentPage + 1)
-                : (_nextChapter != null ? _goToNextChapter : null),
-            isChapterBoundary: currentPage == 0 || currentPage == images.length - 1,
-            previousChapterTitle: _previousChapter?.title,
-            nextChapterTitle: _nextChapter?.title,
+          child: Align(
+            alignment: Alignment.center,
+            child: _ReaderControls(
+              leftLabel: 'Previous',
+              rightLabel: 'Next',
+              centerText:
+                  'Page ${currentPage + 1} of ${images.length}',
+              onPrevious: currentPage > 0
+                  ? () => goToPage(
+                        currentPage - 1,
+                      )
+                  : (_previousChapter != null
+                      ? _goToPreviousChapter
+                      : null),
+              onNext: currentPage < images.length - 1
+                  ? () => goToPage(
+                        currentPage + 1,
+                      )
+                  : (_nextChapter != null
+                      ? _goToNextChapter
+                      : null),
+              isChapterBoundary:
+                  currentPage == 0 ||
+                      currentPage == images.length - 1,
+              previousChapterTitle:
+                  _previousChapter?.title,
+              nextChapterTitle:
+                  _nextChapter?.title,
+            ),
           ),
         ),
       ],
@@ -471,67 +556,94 @@ class _ReaderControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 58,
-      decoration: BoxDecoration(
-        color: tomoCard.withOpacity(0.96),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white10,
-        ),
-      ),
+    return SizedBox(
+      height: 64,
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 30),
-            child: IconButton(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 32,
+            ),
+            child: _ReaderNavButton(
+              icon: Icons.chevron_left_rounded,
               onPressed: onPrevious,
               tooltip: leftLabel,
-              constraints: const BoxConstraints(
-                minWidth: 64,
-                minHeight: 58,
-              ),
-              padding: EdgeInsets.zero,
-              icon: const Icon(
-                Icons.chevron_left,
-              ),
-              color: onPrevious == null
-                  ? Colors.white12
-                  : Colors.white,
             ),
           ),
-          Expanded(
-            child: Center(
-              child: Text(
-                centerText,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 7,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              centerText,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 30),
-            child: IconButton(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 32,
+            ),
+            child: _ReaderNavButton(
+              icon: Icons.chevron_right_rounded,
               onPressed: onNext,
               tooltip: rightLabel,
-              constraints: const BoxConstraints(
-                minWidth: 64,
-                minHeight: 58,
-              ),
-              padding: EdgeInsets.zero,
-              icon: const Icon(
-                Icons.chevron_right,
-              ),
-              color: onNext == null
-                  ? Colors.white12
-                  : Colors.white,
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ReaderNavButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final String tooltip;
+
+  const _ReaderNavButton({
+    required this.icon,
+    required this.onPressed,
+    required this.tooltip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+
+    return Material(
+      color: enabled
+          ? Colors.white.withOpacity(0.06)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox(
+          width: 52,
+          height: 52,
+          child: Tooltip(
+            message: tooltip,
+            child: Icon(
+              icon,
+              size: 30,
+              color: enabled
+                  ? Colors.white
+                  : Colors.white12,
+            ),
+          ),
+        ),
       ),
     );
   }

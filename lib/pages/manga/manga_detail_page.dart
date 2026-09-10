@@ -30,7 +30,8 @@ class _MangaDetailPageState
 
   String? lastChapterId;
   Set<String> readChapters = <String>{};
-  final TextEditingController _chapterSearchController = TextEditingController();
+  final TextEditingController _chapterSearchController =
+      TextEditingController();
   String _chapterSearch = '';
 
   @override
@@ -63,27 +64,27 @@ class _MangaDetailPageState
   }
 
   Future<void> _toggleChapterRead(String chapterId) async {
-  final updated = <String>{...readChapters};
+    final updated = <String>{...readChapters};
 
-  if (updated.contains(chapterId)) {
-    updated.remove(chapterId);
-  } else {
-    updated.add(chapterId);
+    if (updated.contains(chapterId)) {
+      updated.remove(chapterId);
+    } else {
+      updated.add(chapterId);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setStringList(
+      'tomo_read_${widget.manga.id}',
+      updated.toList(),
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      readChapters = updated;
+    });
   }
-
-  final prefs = await SharedPreferences.getInstance();
-
-  await prefs.setStringList(
-    'tomo_read_${widget.manga.id}',
-    updated.toList(),
-  );
-
-  if (!mounted) return;
-
-  setState(() {
-    readChapters = updated;
-  });
-}
 
   Future<void> loadChapters() async {
     setState(() {
@@ -112,7 +113,6 @@ class _MangaDetailPageState
     }
   }
 
-
   List<ChapterItem> get _filteredChapters {
     final query = _chapterSearch.trim().toLowerCase();
     if (query.isEmpty) return chapters;
@@ -124,7 +124,8 @@ class _MangaDetailPageState
 
   @override
   Widget build(BuildContext context) {
-    final readCount = chapters.where((c) => readChapters.contains(c.id)).length;
+    final readCount =
+        chapters.where((c) => readChapters.contains(c.id)).length;
     final totalCount = chapters.length;
 
     return Scaffold(
@@ -172,7 +173,8 @@ class _MangaDetailPageState
                                   height: 260,
                                   fit: BoxFit.cover,
                                   cacheWidth: (180 *
-                                          MediaQuery.devicePixelRatioOf(context) *
+                                          MediaQuery.devicePixelRatioOf(
+                                              context) *
                                           1.15)
                                       .round(),
                                   filterQuality: FilterQuality.low,
@@ -216,16 +218,19 @@ class _MangaDetailPageState
                                   );
                                   await _loadProgress();
                                 },
-                                icon: const Icon(Icons.play_arrow_rounded),
+                                icon: const Icon(
+                                  Icons.play_arrow_rounded,
+                                ),
                                 label: Text(
-                                  'Continuar — ${lastChapter.title}',
+                                  'Continue — ${lastChapter.title}',
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 style: FilledButton.styleFrom(
                                   backgroundColor: tomoPink,
                                   foregroundColor: Colors.white,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
+                                    borderRadius:
+                                        BorderRadius.circular(14),
                                   ),
                                 ),
                               ),
@@ -234,7 +239,8 @@ class _MangaDetailPageState
                         ),
                       const SizedBox(height: 22),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment:
+                            MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
                             'Chapters',
@@ -259,7 +265,7 @@ class _MangaDetailPageState
                             fontSize: 14,
                           ),
                           decoration: InputDecoration(
-                            hintText: 'Buscar capítulo...',
+                            hintText: 'Search chapter...',
                             hintStyle: const TextStyle(
                               color: Colors.white38,
                             ),
@@ -286,21 +292,25 @@ class _MangaDetailPageState
                             filled: true,
                             fillColor: tomoCard,
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius:
+                                  BorderRadius.circular(14),
                               borderSide: BorderSide.none,
                             ),
                             enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius:
+                                  BorderRadius.circular(14),
                               borderSide: BorderSide.none,
                             ),
                             focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius:
+                                  BorderRadius.circular(14),
                               borderSide: const BorderSide(
                                 color: tomoPink,
                                 width: 1,
                               ),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(
+                            contentPadding:
+                                const EdgeInsets.symmetric(
                               vertical: 14,
                             ),
                           ),
@@ -310,16 +320,24 @@ class _MangaDetailPageState
                           chapterError == null &&
                           totalCount > 0)
                         Container(
-                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 13),
+                          padding: const EdgeInsets.fromLTRB(
+                            16,
+                            14,
+                            16,
+                            13,
+                          ),
                           decoration: BoxDecoration(
                             color: tomoCard,
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius:
+                                BorderRadius.circular(16),
                           ),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
                                     'Progress',
@@ -341,12 +359,18 @@ class _MangaDetailPageState
                               ),
                               const SizedBox(height: 9),
                               ClipRRect(
-                                borderRadius: BorderRadius.circular(99),
+                                borderRadius:
+                                    BorderRadius.circular(99),
                                 child: LinearProgressIndicator(
-                                  value: totalCount == 0 ? 0 : readCount / totalCount,
+                                  value: totalCount == 0
+                                      ? 0
+                                      : readCount / totalCount,
                                   minHeight: 7,
                                   backgroundColor: Colors.white10,
-                                  valueColor: const AlwaysStoppedAnimation<Color>(tomoPink),
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                    tomoPink,
+                                  ),
                                 ),
                               ),
                             ],
@@ -359,13 +383,19 @@ class _MangaDetailPageState
               ),
               if (loadingChapters)
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+                  padding: const EdgeInsets.fromLTRB(
+                    20,
+                    0,
+                    20,
+                    30,
+                  ),
                   sliver: SliverToBoxAdapter(
                     child: Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         color: tomoCard,
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius:
+                            BorderRadius.circular(18),
                       ),
                       child: const Column(
                         children: [
@@ -380,7 +410,8 @@ class _MangaDetailPageState
                           SizedBox(height: 14),
                           Text(
                             'Loading chapters...',
-                            style: TextStyle(color: Colors.white70),
+                            style:
+                                TextStyle(color: Colors.white70),
                           ),
                         ],
                       ),
@@ -389,13 +420,19 @@ class _MangaDetailPageState
                 )
               else if (chapterError != null)
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+                  padding: const EdgeInsets.fromLTRB(
+                    20,
+                    0,
+                    20,
+                    30,
+                  ),
                   sliver: SliverToBoxAdapter(
                     child: Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         color: tomoCard,
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius:
+                            BorderRadius.circular(18),
                       ),
                       child: Column(
                         children: [
@@ -407,7 +444,9 @@ class _MangaDetailPageState
                           const SizedBox(height: 10),
                           const Text(
                             'Could not load chapters.',
-                            style: TextStyle(fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           const SizedBox(height: 6),
                           Text(
@@ -430,48 +469,69 @@ class _MangaDetailPageState
                 )
               else if (chapters.isEmpty)
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+                  padding: const EdgeInsets.fromLTRB(
+                    20,
+                    0,
+                    20,
+                    30,
+                  ),
                   sliver: SliverToBoxAdapter(
                     child: Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         color: tomoCard,
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius:
+                            BorderRadius.circular(18),
                       ),
                       child: const Text(
                         'No chapters found.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white54),
+                        style:
+                            TextStyle(color: Colors.white54),
                       ),
                     ),
                   ),
                 )
               else if (_filteredChapters.isEmpty)
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+                  padding: const EdgeInsets.fromLTRB(
+                    20,
+                    0,
+                    20,
+                    30,
+                  ),
                   sliver: SliverToBoxAdapter(
                     child: Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         color: tomoCard,
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius:
+                            BorderRadius.circular(18),
                       ),
                       child: const Text(
                         'No chapters match your search.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white54),
+                        style:
+                            TextStyle(color: Colors.white54),
                       ),
                     ),
                   ),
                 )
               else
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
+                  padding: const EdgeInsets.fromLTRB(
+                    20,
+                    0,
+                    20,
+                    30,
+                  ),
                   sliver: SliverList.builder(
                     itemCount: _filteredChapters.length,
                     itemBuilder: (context, index) {
-                      final chapter = _filteredChapters[index];
-                      final isRead = readChapters.contains(chapter.id);
+                      final chapter =
+                          _filteredChapters[index];
+                      final isRead =
+                          readChapters.contains(chapter.id);
 
                       return Material(
                         color: tomoCard,
@@ -480,7 +540,8 @@ class _MangaDetailPageState
                             await Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => MangaReaderPage(
+                                builder: (_) =>
+                                    MangaReaderPage(
                                   manga: widget.manga,
                                   chapter: chapter,
                                   chapters: chapters,
@@ -492,7 +553,8 @@ class _MangaDetailPageState
                           child: Container(
                             decoration: BoxDecoration(
                               border: Border(
-                                bottom: index == chapters.length - 1
+                                bottom: index ==
+                                        chapters.length - 1
                                     ? BorderSide.none
                                     : const BorderSide(
                                         color: Colors.white10,
@@ -500,7 +562,8 @@ class _MangaDetailPageState
                                       ),
                               ),
                             ),
-                            padding: const EdgeInsets.symmetric(
+                            padding:
+                                const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 15,
                             ),
@@ -510,8 +573,11 @@ class _MangaDetailPageState
                                   width: 38,
                                   height: 38,
                                   decoration: BoxDecoration(
-                                    color: tomoPink.withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(10),
+                                    color: tomoPink.withOpacity(
+                                      0.12,
+                                    ),
+                                    borderRadius:
+                                        BorderRadius.circular(10),
                                   ),
                                   child: const Icon(
                                     Icons.menu_book_outlined,
@@ -524,19 +590,25 @@ class _MangaDetailPageState
                                   child: Text(
                                     chapter.title,
                                     style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      color: isRead ? Colors.white54 : Colors.white,
+                                      fontWeight:
+                                          FontWeight.w600,
+                                      color: isRead
+                                          ? Colors.white54
+                                          : Colors.white,
                                     ),
                                   ),
                                 ),
-                                                                IconButton(
+                                IconButton(
                                   onPressed: () =>
-                                      _toggleChapterRead(chapter.id),
+                                      _toggleChapterRead(
+                                    chapter.id,
+                                  ),
                                   tooltip: isRead
-                                      ? 'Marcar como no leído'
-                                      : 'Marcar como leído',
+                                      ? 'Mark as unread'
+                                      : 'Mark as read',
                                   padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(
+                                  constraints:
+                                      const BoxConstraints(
                                     minWidth: 44,
                                     minHeight: 44,
                                   ),
@@ -567,6 +639,5 @@ class _MangaDetailPageState
 }
 
 // ============================================================
-// LECTOR TOMO
+// TOMO READER
 // ============================================================
-
