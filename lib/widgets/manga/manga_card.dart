@@ -6,13 +6,13 @@ import '../../theme/tomo_theme.dart';
 class MangaCard extends StatelessWidget {
   final MangaItem manga;
   final VoidCallback onTap;
-  final VoidCallback onRemove;
+  final VoidCallback? onRemove;
 
   const MangaCard({
     super.key,
     required this.manga,
     required this.onTap,
-    required this.onRemove,
+    this.onRemove,
   });
 
   @override
@@ -44,12 +44,6 @@ class MangaCard extends StatelessWidget {
                             width: double.infinity,
                             height: double.infinity,
                             fit: BoxFit.cover,
-                            cacheWidth: (MediaQuery.sizeOf(context).width / 2 *
-                                    MediaQuery.devicePixelRatioOf(context) *
-                                    1.1)
-                                .round(),
-                            filterQuality: FilterQuality.low,
-                            gaplessPlayback: true,
                             errorBuilder: (_, __, ___) {
                               return Container(
                                 color: tomoCard,
@@ -63,66 +57,67 @@ class MangaCard extends StatelessWidget {
                           ),
                   ),
                 ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Material(
-                    color: Colors.black.withOpacity(0.70),
-                    borderRadius: BorderRadius.circular(12),
-                    child: InkWell(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (dialogContext) {
-                            return AlertDialog(
-                              backgroundColor: tomoCard,
-                              title: const Text(
-                                'Remove manga?',
-                              ),
-                              content: Text(
-                                'Remove "${manga.title}" from your library?',
-                              ),
-                              actions: [
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(dialogContext);
-                                  },
-                                  child: const Text(
-                                    'Cancel',
-                                    style: TextStyle(
-                                      color: Colors.white60,
-                                    ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.pop(dialogContext);
-                                    onRemove();
-                                  },
-                                  child: const Text(
-                                    'Remove',
-                                    style: TextStyle(
-                                      color: Colors.redAccent,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        );
-                      },
+                if (onRemove != null)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Material(
+                      color: Colors.black.withOpacity(0.70),
                       borderRadius: BorderRadius.circular(12),
-                      child: const Padding(
-                        padding: EdgeInsets.all(8),
-                        child: Icon(
-                          Icons.delete_outline,
-                          size: 19,
-                          color: Colors.white,
+                      child: InkWell(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (dialogContext) {
+                              return AlertDialog(
+                                backgroundColor: tomoCard,
+                                title: const Text(
+                                  'Remove manga?',
+                                ),
+                                content: Text(
+                                  'Remove "${manga.title}" from your library?',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(dialogContext);
+                                    },
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(
+                                        color: Colors.white60,
+                                      ),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pop(dialogContext);
+                                      onRemove!();
+                                    },
+                                    child: const Text(
+                                      'Remove',
+                                      style: TextStyle(
+                                        color: Colors.redAccent,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(
+                            Icons.delete_outline,
+                            size: 19,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -141,4 +136,3 @@ class MangaCard extends StatelessWidget {
     );
   }
 }
-
