@@ -69,15 +69,32 @@ class _MangaSearchPageState extends State<MangaSearchPage> {
     }
   }
 
-  void openManga(MangaItem manga) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MangaDetailPage(
-          manga: manga,
+  Future<void> openManga(MangaItem manga) async {
+    try {
+      final fullManga =
+          await _mangaService.fetchManga(manga.url);
+
+      if (!mounted) return;
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MangaDetailPage(
+            manga: fullManga,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Could not load manga details:\n$e',
+          ),
+        )
+      );
+    }
   }
 
   @override
@@ -279,6 +296,8 @@ class _SearchResultCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleTags = manga.tags.take(4).toList();
+
     return Material(
       color: tomoCard,
       borderRadius: BorderRadius.circular(16),
@@ -338,7 +357,7 @@ class _SearchResultCard extends StatelessWidget {
                     children: [
                       Text(
                         manga.title,
-                        maxLines: 3,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 16,
@@ -346,13 +365,25 @@ class _SearchResultCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'WeebCentral',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.white38,
+                      if (visibleTags.isNotEmpty)
+                        Text(
+                          visibleTags.join(' · '),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.white38,
+                            height: 1.3,
+                          ),
+                        )
+                      else
+                        const Text(
+                          'No tags available',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white24,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),
