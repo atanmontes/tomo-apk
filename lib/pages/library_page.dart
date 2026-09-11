@@ -21,11 +21,18 @@ class LibraryPageState extends State<LibraryPage> {
   List<MangaItem> library = [];
   bool loading = true;
   String search = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     reload();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> reload() async {
@@ -51,22 +58,6 @@ class LibraryPageState extends State<LibraryPage> {
       library = loaded;
       loading = false;
     });
-  }
-
-  Future<void> _removeManga(MangaItem manga) async {
-    library.removeWhere((item) => item.id == manga.id);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      libraryKey,
-      jsonEncode(
-        library.map((item) => item.toJson()).toList(),
-      ),
-    );
-
-    if (!mounted) return;
-
-    setState(() {});
   }
 
   List<MangaItem> get filteredLibrary {
@@ -130,6 +121,7 @@ class LibraryPageState extends State<LibraryPage> {
             ),
             const SizedBox(height: 16),
             TextField(
+              controller: _searchController,
               onChanged: (value) {
                 setState(() {
                   search = value;
@@ -146,6 +138,22 @@ class LibraryPageState extends State<LibraryPage> {
                   color: Colors.white38,
                   size: 21,
                 ),
+                suffixIcon: search.isNotEmpty
+                    ? IconButton(
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {
+                            search = '';
+                          });
+                        },
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: Colors.white54,
+                          size: 20,
+                        ),
+                        splashRadius: 20,
+                      )
+                    : null,
                 filled: true,
                 fillColor: tomoCard,
                 border: OutlineInputBorder(
@@ -205,7 +213,6 @@ class LibraryPageState extends State<LibraryPage> {
                                   child: MangaCard(
                                     manga: manga,
                                     onTap: () => _openManga(manga),
-                                    onRemove: () => _removeManga(manga),
                                   ),
                                 );
                               },
@@ -247,7 +254,7 @@ class _EmptyLibrary extends StatelessWidget {
               ),
               SizedBox(height: 8),
               Text(
-                'Open a manga and tap "Add to library" to save it here.',
+                'Open a manga and tap the + button to save it here.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white54,

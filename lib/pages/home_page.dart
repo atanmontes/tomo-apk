@@ -77,6 +77,7 @@ class _HomeContentState extends State<_HomeContent> {
   List<MangaItem> searchResults = [];
   bool searching = false;
   Timer? _searchDebounce;
+  final TextEditingController _searchController = TextEditingController();
 
   final MangaService _mangaService = MangaService();
 
@@ -132,6 +133,7 @@ class _HomeContentState extends State<_HomeContent> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -188,6 +190,7 @@ class _HomeContentState extends State<_HomeContent> {
             ),
             const SizedBox(height: 18),
             TextField(
+              controller: _searchController,
               onChanged: _onSearchChanged,
               style: const TextStyle(
                 color: Colors.white,
@@ -200,6 +203,19 @@ class _HomeContentState extends State<_HomeContent> {
                   color: Colors.white38,
                   size: 21,
                 ),
+                suffixIcon: search.isNotEmpty
+                    ? IconButton(
+                        onPressed: () {
+                          _searchController.clear();
+                          _onSearchChanged('');
+                        },
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white38,
+                          size: 19,
+                        ),
+                      )
+                    : null,
                 filled: true,
                 fillColor: tomoCard,
                 border: OutlineInputBorder(

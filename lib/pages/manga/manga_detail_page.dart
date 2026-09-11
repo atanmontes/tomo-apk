@@ -144,7 +144,7 @@ class _MangaDetailPageState
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Manga agregado a tu biblioteca.'),
+            content: Text('Manga added to your library.'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -159,7 +159,62 @@ class _MangaDetailPageState
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('No se pudo agregar el manga.'),
+            content: Text('Could not add the manga.'),
+          ),
+        );
+    }
+  }
+
+  Future<void> _removeFromLibrary() async {
+    if (!_inLibrary || _libraryBusy) {
+      return;
+    }
+
+    setState(() {
+      _libraryBusy = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('tomo_library');
+      final List<dynamic> data = saved == null
+          ? <dynamic>[]
+          : (jsonDecode(saved) as List<dynamic>);
+
+      data.removeWhere((item) {
+        return item is Map &&
+            item['id']?.toString() == widget.manga.id;
+      });
+
+      await prefs.setString('tomo_library', jsonEncode(data));
+
+      if (!mounted) return;
+
+      setState(() {
+        _inLibrary = false;
+        _libraryBusy = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Manga removed from your library.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _libraryBusy = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Could not remove the manga.'),
           ),
         );
     }
@@ -289,33 +344,69 @@ class _MangaDetailPageState
                         CrossAxisAlignment.start,
                     children: [
                       Center(
-                        child: manga.cover.isEmpty
-                            ? Container(
-                                width: 220,
-                                height: 320,
-                                color: tomoCard,
-                                child: const Icon(
-                                  Icons.menu_book,
-                                  size: 60,
-                                  color: Colors.white24,
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            manga.cover.isEmpty
+                                ? Container(
+                                    width: 260,
+                                    height: 380,
+                                    color: tomoCard,
+                                    child: const Icon(
+                                      Icons.menu_book,
+                                      size: 60,
+                                      color: Colors.white24,
+                                    ),
+                                  )
+                                : Image.network(
+                                    manga.cover,
+                                    width: 260,
+                                    height: 380,
+                                    fit: BoxFit.cover,
+                                    cacheWidth: (260 *
+                                            MediaQuery.devicePixelRatioOf(context) *
+                                            1.15)
+                                        .round(),
+                                    filterQuality: FilterQuality.low,
+                                    gaplessPlayback: true,
+                                  ),
+                            Positioned(
+                              top: 10,
+                              right: 10,
+                              child: Material(
+                                color: tomoPink,
+                                borderRadius: BorderRadius.circular(12),
+                                child: InkWell(
+                                  onTap: _libraryBusy
+                                      ? null
+                                      : (_inLibrary
+                                          ? _removeFromLibrary
+                                          : _addToLibrary),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: SizedBox(
+                                    width: 48,
+                                    height: 48,
+                                    child: _libraryBusy
+                                        ? const Padding(
+                                            padding: EdgeInsets.all(13),
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Icon(
+                                            _inLibrary
+                                                ? Icons.close_rounded
+                                                : Icons.add_rounded,
+                                            color: Colors.white,
+                                            size: 27,
+                                          ),
+                                  ),
                                 ),
-                              )
-                            : Image.network(
-                                manga.cover,
-                                width: 220,
-                                height: 320,
-                                fit: BoxFit.cover,
-                                cacheWidth: (220 *
-                                        MediaQuery
-                                            .devicePixelRatioOf(
-                                          context,
-                                        ) *
-                                        1.15)
-                                    .round(),
-                                filterQuality:
-                                    FilterQuality.low,
-                                gaplessPlayback: true,
                               ),
+                            ),
+                          ],
+                        ),
                       ),
 
                       const SizedBox(height: 24),
@@ -331,60 +422,11 @@ class _MangaDetailPageState
 
                       const SizedBox(height: 14),
 
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: FilledButton.icon(
-                          onPressed: _inLibrary || _libraryBusy
-                              ? null
-                              : _addToLibrary,
-                          icon: _libraryBusy
-                              ? const SizedBox(
-                                  width: 19,
-                                  height: 19,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Icon(
-                                  _inLibrary
-                                      ? Icons.check_rounded
-                                      : Icons.bookmark_add_outlined,
-                                ),
-                          label: Text(
-                            _libraryBusy
-                                ? 'Agregando...'
-                                : _inLibrary
-                                    ? 'En tu biblioteca'
-                                    : 'Agregar a la biblioteca',
-                          ),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: _inLibrary
-                                ? tomoCard
-                                : tomoPink,
-                            foregroundColor: _inLibrary
-                                ? Colors.white70
-                                : Colors.white,
-                            disabledBackgroundColor: _inLibrary
-                                ? tomoCard
-                                : tomoPink.withOpacity(0.65),
-                            disabledForegroundColor: Colors.white70,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                      ),
-
                       // ========================================================
                       // SYNOPSIS
                       // ========================================================
 
-                      if (widget
-                          .manga
-                          .description
-                          .isNotEmpty) ...[
+                      if (manga.description.isNotEmpty) ...[
                         const SizedBox(height: 18),
 
                         const Text(
@@ -442,8 +484,8 @@ class _MangaDetailPageState
                                 },
                                 child: Text(
                                   _synopsisExpanded
-                                      ? 'Leer menos'
-                                      : 'Leer más',
+                                      ? 'Read less'
+                                      : 'Read more',
                                   style:
                                       const TextStyle(
                                     color: tomoPink,
@@ -481,8 +523,7 @@ class _MangaDetailPageState
                                   // AUTHORS
                                   // ------------------------------------------------
 
-                                  if (widget
-                                      .manga
+                                  if (manga
                                       .authors
                                       .isNotEmpty) ...[
                                     const Text(
@@ -501,8 +542,7 @@ class _MangaDetailPageState
                                     ),
 
                                     Text(
-                                      widget
-                                          .manga
+                                      manga
                                           .authors
                                           .join(', '),
                                       style:
@@ -522,16 +562,13 @@ class _MangaDetailPageState
                                   // INFORMATION
                                   // ------------------------------------------------
 
-                                  if (widget
-                                          .manga
+                                  if (manga
                                           .type
                                           .isNotEmpty ||
-                                      widget
-                                          .manga
+                                      manga
                                           .status
                                           .isNotEmpty ||
-                                      widget
-                                          .manga
+                                      manga
                                           .released
                                           .isNotEmpty)
                                     Container(
@@ -551,46 +588,39 @@ class _MangaDetailPageState
                                       ),
                                       child: Column(
                                         children: [
-                                          if (widget
-                                              .manga
+                                          if (manga
                                               .type
                                               .isNotEmpty)
                                             _MangaInfoRow(
                                               label: 'Type',
-                                              value: widget
-                                                  .manga
+                                              value: manga
                                                   .type,
                                             ),
 
-                                          if (widget
-                                              .manga
+                                          if (manga
                                               .status
                                               .isNotEmpty)
                                             _MangaInfoRow(
                                               label:
                                                   'Status',
-                                              value: widget
-                                                  .manga
+                                              value: manga
                                                   .status,
                                             ),
 
-                                          if (widget
-                                              .manga
+                                          if (manga
                                               .released
                                               .isNotEmpty)
                                             _MangaInfoRow(
                                               label:
                                                   'Released',
-                                              value: widget
-                                                  .manga
+                                              value: manga
                                                   .released,
                                             ),
 
                                           _MangaInfoRow(
                                             label:
                                                 'Official Translation',
-                                            value: widget
-                                                    .manga
+                                            value: manga
                                                     .officialTranslation
                                                 ? 'Yes'
                                                 : 'No',
@@ -599,9 +629,15 @@ class _MangaDetailPageState
                                           _MangaInfoRow(
                                             label:
                                                 'Anime Adaptation',
-                                            value: widget
-                                                    .manga
+                                            value: manga
                                                     .animeAdaptation
+                                                ? 'Yes'
+                                                : 'No',
+                                          ),
+
+                                          _MangaInfoRow(
+                                            label: 'Adult Content',
+                                            value: manga.adultContent
                                                 ? 'Yes'
                                                 : 'No',
                                           ),
@@ -613,8 +649,7 @@ class _MangaDetailPageState
                                   // TAGS
                                   // ------------------------------------------------
 
-                                  if (widget
-                                      .manga
+                                  if (manga
                                       .tags
                                       .isNotEmpty) ...[
                                     const SizedBox(
@@ -639,8 +674,7 @@ class _MangaDetailPageState
                                     Wrap(
                                       spacing: 7,
                                       runSpacing: 7,
-                                      children: widget
-                                          .manga
+                                      children: manga
                                           .tags
                                           .map(
                                             (tag) {
@@ -733,8 +767,8 @@ class _MangaDetailPageState
                           ),
                           child: Text(
                             _detailsExpanded
-                                ? 'Ocultar detalles'
-                                : 'Mostrar detalles',
+                                ? 'Hide details'
+                                : 'Show details',
                             style: const TextStyle(
                               fontSize: 14,
                               fontWeight:
