@@ -25,6 +25,8 @@ class _MangaDetailPageState
   final MangaService _mangaService = MangaService();
   List<ChapterItem> chapters = [];
 
+  MangaItem? _detailsManga;
+
   bool loadingChapters = true;
   String? chapterError;
 
@@ -48,8 +50,26 @@ class _MangaDetailPageState
   @override
   void initState() {
     super.initState();
+    _loadDetails();
     loadChapters();
     _loadProgress();
+  }
+
+  Future<void> _loadDetails() async {
+    try {
+      final found = await _mangaService.fetchManga(
+        widget.manga.url,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _detailsManga = found;
+      });
+    } catch (_) {
+      // The detail page can continue using the manga
+      // received from search/library if the metadata request fails.
+    }
   }
 
   Future<void> _loadProgress() async {
@@ -139,6 +159,8 @@ class _MangaDetailPageState
 
   @override
   Widget build(BuildContext context) {
+    final manga = _detailsManga ?? widget.manga;
+
     final readCount = chapters
         .where(
           (c) => readChapters.contains(c.id),
@@ -177,7 +199,7 @@ class _MangaDetailPageState
                         child: ClipRRect(
                           borderRadius:
                               BorderRadius.circular(18),
-                          child: widget.manga.cover.isEmpty
+                          child: manga.cover.isEmpty
                               ? Container(
                                   width: 180,
                                   height: 260,
@@ -190,7 +212,7 @@ class _MangaDetailPageState
                                   ),
                                 )
                               : Image.network(
-                                  widget.manga.cover,
+                                  manga.cover,
                                   width: 180,
                                   height: 260,
                                   fit: BoxFit.cover,
@@ -211,7 +233,7 @@ class _MangaDetailPageState
                       const SizedBox(height: 24),
 
                       Text(
-                        widget.manga.title,
+                        manga.title,
                         style: const TextStyle(
                           fontSize: 26,
                           fontWeight:
@@ -253,7 +275,7 @@ class _MangaDetailPageState
                                     .start,
                             children: [
                               Text(
-                                widget.manga.description,
+                                manga.description,
                                 maxLines:
                                     _synopsisExpanded
                                         ? null
@@ -620,7 +642,7 @@ class _MangaDetailPageState
                                       builder: (_) =>
                                           MangaReaderPage(
                                         manga:
-                                            widget.manga,
+                                            manga,
                                         chapter:
                                             lastChapter,
                                         chapters:
@@ -1101,7 +1123,7 @@ class _MangaDetailPageState
                                 builder: (_) =>
                                     MangaReaderPage(
                                   manga:
-                                      widget.manga,
+                                      manga,
                                   chapter:
                                       chapter,
                                   chapters:

@@ -42,87 +42,48 @@ class MangaService {
     Document document,
     String label,
   ) {
-    final target = _clean(label).toLowerCase();
+    final target = _clean(label)
+        .toLowerCase()
+        .replaceAll(':', '');
 
-    // WeebCentral coloca los campos de metadata
-    // dentro de elementos que suelen tener opacity-70.
-    //
-    // IMPORTANTE:
-    // No usamos element.text completo para decidir qué
-    // links pertenecen al campo, porque un contenedor
-    // padre puede contener TODOS los metadatos.
-    //
-    // Primero buscamos elementos cuyo propio texto
-    // comience con la etiqueta y que tengan enlaces.
-    for (final element
-        in document.querySelectorAll('div.opacity-70')) {
-      final directText = element.nodes
-          .whereType<Text>()
-          .map((node) => node.data ?? '')
-          .join(' ');
+    // WeebCentral places Author(s) and Tags(s) inside
+    // an <li> whose label is inside a <strong>.
+    // We only read links from that exact row so values
+    // from other metadata fields cannot leak into the result.
+    for (final element in document.querySelectorAll('li')) {
+      final strong = element.querySelector('strong');
 
-      final cleanedDirectText = _clean(directText);
-      final lowerDirectText =
-          cleanedDirectText.toLowerCase();
-
-      if (!lowerDirectText.startsWith(target)) {
+      if (strong == null) {
         continue;
       }
 
-      final links = element.children
-          .where(
-            (child) => child.localName == 'a',
-          )
-          .map<String>(
-            (child) => _clean(child.text),
-          )
-          .where(
-            (text) => text.isNotEmpty,
-          )
+      final currentLabel = _clean(strong.text)
+          .toLowerCase()
+          .replaceAll(':', '');
+
+      if (currentLabel != target) {
+        continue;
+      }
+
+      final links = element
+          .querySelectorAll('a')
+          .map((link) => _clean(link.text))
+          .where((text) => text.isNotEmpty)
           .toList();
 
       if (links.isNotEmpty) {
         return links;
       }
-    }
 
-    // --------------------------------------------------
-    // FALLBACK
-    // --------------------------------------------------
-    //
-    // Si la estructura cambia, buscamos cualquier
-    // elemento que tenga la etiqueta en su texto
-    // directo y tomamos solamente sus enlaces directos.
-    //
-    for (final element
-        in document.querySelectorAll('*')) {
-      final directText = element.nodes
-          .whereType<Text>()
-          .map((node) => node.data ?? '')
-          .join(' ');
-
-      final cleanedDirectText = _clean(directText);
-      final lowerDirectText =
-          cleanedDirectText.toLowerCase();
-
-      if (!lowerDirectText.startsWith(target)) {
-        continue;
-      }
-
-      final links = element.children
-          .where(
-            (child) => child.localName == 'a',
-          )
-          .map<String>(
-            (child) => _clean(child.text),
-          )
-          .where(
-            (text) => text.isNotEmpty,
-          )
+      // Fallback for a value rendered without <a>.
+      final spans = element
+          .querySelectorAll('span')
+          .map((span) => _clean(span.text))
+          .where((text) => text.isNotEmpty)
           .toList();
 
-      if (links.isNotEmpty) {
-        return links;
+      if (spans.isNotEmpty) {
+        return spans;
       }
     }
 
@@ -582,11 +543,9 @@ class MangaService {
       for (final element
           in article.querySelectorAll('*')) {
         final directText = element.nodes
-            .whereType<Text>()
-            .map(
-              (node) => node.data ?? '',
-            )
-            .join(' ');
+          .whereType<Text>()
+          .map((node) => node.data)
+          .join(' ');
 
         final text =
             _clean(directText);
