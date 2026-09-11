@@ -18,12 +18,12 @@ class MangaCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
+        AspectRatio(
+          aspectRatio: 0.73,
           child: GestureDetector(
             onTap: onTap,
             child: SizedBox(
               width: double.infinity,
-              height: double.infinity,
               child: manga.cover.isEmpty
                   ? Container(
                       color: tomoCard,
@@ -38,6 +38,12 @@ class MangaCard extends StatelessWidget {
                       width: double.infinity,
                       height: double.infinity,
                       fit: BoxFit.cover,
+                      cacheWidth: (220 *
+                              MediaQuery.devicePixelRatioOf(context) *
+                              1.15)
+                          .round(),
+                      filterQuality: FilterQuality.low,
+                      gaplessPlayback: true,
                       errorBuilder: (_, __, ___) {
                         return Container(
                           color: tomoCard,
@@ -53,13 +59,19 @@ class MangaCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          manga.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
+        // The title lives in a fixed two-line area so it can never
+        // change the position or size of the cover above it.
+        SizedBox(
+          height: 40,
+          child: Text(
+            manga.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+              height: 1.2,
+            ),
           ),
         ),
       ],

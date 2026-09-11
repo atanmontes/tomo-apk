@@ -203,7 +203,7 @@ class LibraryPageState extends State<LibraryPage> {
                                 crossAxisCount: 2,
                                 crossAxisSpacing: 14,
                                 mainAxisSpacing: 18,
-                                childAspectRatio: 0.61,
+                                childAspectRatio: 0.60,
                               ),
                               itemCount: mangas.length,
                               itemBuilder: (context, index) {

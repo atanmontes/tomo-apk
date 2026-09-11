@@ -264,7 +264,7 @@ class _HomeContentState extends State<_HomeContent> {
                                 crossAxisCount: 2,
                                 crossAxisSpacing: 14,
                                 mainAxisSpacing: 18,
-                                childAspectRatio: 0.61,
+                                childAspectRatio: 0.60,
                               ),
                               itemCount: searchResults.length,
                               itemBuilder: (context, index) {
