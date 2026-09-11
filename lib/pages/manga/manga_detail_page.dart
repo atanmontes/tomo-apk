@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -27,6 +29,9 @@ class _MangaDetailPageState
 
   MangaItem? _detailsManga;
 
+  bool _inLibrary = false;
+  bool _libraryBusy = false;
+
   bool loadingChapters = true;
   String? chapterError;
 
@@ -51,6 +56,7 @@ class _MangaDetailPageState
   void initState() {
     super.initState();
     _loadDetails();
+    _loadLibraryState();
     loadChapters();
     _loadProgress();
   }
@@ -69,6 +75,93 @@ class _MangaDetailPageState
     } catch (_) {
       // The detail page can continue using the manga
       // received from search/library if the metadata request fails.
+    }
+  }
+
+  Future<void> _loadLibraryState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('tomo_library');
+
+    if (saved == null) {
+      return;
+    }
+
+    try {
+      final List<dynamic> data = jsonDecode(saved);
+      final exists = data.any((item) {
+        return item is Map &&
+            item['id']?.toString() == widget.manga.id;
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        _inLibrary = exists;
+      });
+    } catch (_) {
+      // Ignore invalid old library data.
+    }
+  }
+
+  Future<void> _addToLibrary() async {
+    if (_inLibrary || _libraryBusy) {
+      return;
+    }
+
+    setState(() {
+      _libraryBusy = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString('tomo_library');
+      final List<dynamic> data = saved == null
+          ? <dynamic>[]
+          : (jsonDecode(saved) as List<dynamic>);
+
+      final exists = data.any((item) {
+        return item is Map &&
+            item['id']?.toString() == widget.manga.id;
+      });
+
+      if (!exists) {
+        final mangaToSave = _detailsManga ?? widget.manga;
+        data.insert(0, mangaToSave.toJson());
+        await prefs.setString(
+          'tomo_library',
+          jsonEncode(data),
+        );
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _inLibrary = true;
+        _libraryBusy = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Manga agregado a tu biblioteca.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        _libraryBusy = false;
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo agregar el manga.'),
+          ),
+        );
     }
   }
 
@@ -159,7 +252,7 @@ class _MangaDetailPageState
 
   @override
   Widget build(BuildContext context) {
-    final manga = _detailsManga ?? widget.manga;
+  final manga = _detailsManga ?? widget.manga;
 
     final readCount = chapters
         .where(
@@ -233,6 +326,54 @@ class _MangaDetailPageState
                           fontSize: 26,
                           fontWeight:
                               FontWeight.bold,
+                        ),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: FilledButton.icon(
+                          onPressed: _inLibrary || _libraryBusy
+                              ? null
+                              : _addToLibrary,
+                          icon: _libraryBusy
+                              ? const SizedBox(
+                                  width: 19,
+                                  height: 19,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Icon(
+                                  _inLibrary
+                                      ? Icons.check_rounded
+                                      : Icons.bookmark_add_outlined,
+                                ),
+                          label: Text(
+                            _libraryBusy
+                                ? 'Agregando...'
+                                : _inLibrary
+                                    ? 'En tu biblioteca'
+                                    : 'Agregar a la biblioteca',
+                          ),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _inLibrary
+                                ? tomoCard
+                                : tomoPink,
+                            foregroundColor: _inLibrary
+                                ? Colors.white70
+                                : Colors.white,
+                            disabledBackgroundColor: _inLibrary
+                                ? tomoCard
+                                : tomoPink.withOpacity(0.65),
+                            disabledForegroundColor: Colors.white70,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
                         ),
                       ),
 
