@@ -8,6 +8,7 @@ import '../services/manga/manga_service.dart';
 import '../theme/tomo_theme.dart';
 import '../widgets/manga/manga_card.dart';
 import 'manga/manga_detail_page.dart';
+import 'manga/manga_search_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -60,7 +61,8 @@ class _HomePageState extends State<HomePage> {
   Future<void> saveLibrary() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final data = library.map((manga) => manga.toJson()).toList();
+    final data =
+        library.map((manga) => manga.toJson()).toList();
 
     await prefs.setString(
       libraryKey,
@@ -91,7 +93,9 @@ class _HomePageState extends State<HomePage> {
     final id = uri.pathSegments[1];
 
     if (library.any((manga) => manga.id == id)) {
-      showError('Ese manga ya está en tu biblioteca.');
+      showError(
+        'Ese manga ya está en tu biblioteca.',
+      );
       return;
     }
 
@@ -100,7 +104,8 @@ class _HomePageState extends State<HomePage> {
     });
 
     try {
-      final manga = await _mangaService.fetchManga(url);
+      final manga =
+          await _mangaService.fetchManga(url);
 
       library.insert(0, manga);
 
@@ -149,7 +154,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> removeManga(MangaItem manga) async {
-    library.removeWhere((item) => item.id == manga.id);
+    library.removeWhere(
+      (item) => item.id == manga.id,
+    );
 
     await saveLibrary();
 
@@ -166,7 +173,9 @@ class _HomePageState extends State<HomePage> {
     }
 
     return library.where((manga) {
-      return manga.title.toLowerCase().contains(query);
+      return manga.title
+          .toLowerCase()
+          .contains(query);
     }).toList();
   }
 
@@ -193,7 +202,10 @@ class _HomePageState extends State<HomePage> {
                 right: 20,
                 top: 20,
                 bottom:
-                    MediaQuery.of(context).viewInsets.bottom + 20,
+                    MediaQuery.of(context)
+                            .viewInsets
+                            .bottom +
+                        20,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -222,7 +234,7 @@ class _HomePageState extends State<HomePage> {
                     keyboardType: TextInputType.url,
                     decoration: InputDecoration(
                       hintText:
-                          '[https://weebcentral.com/series/](https://weebcentral.com/series/)...',
+                          'https://weebcentral.com/series/...',
                       filled: true,
                       fillColor: tomoBackground,
                       border: OutlineInputBorder(
@@ -272,7 +284,8 @@ class _HomePageState extends State<HomePage> {
                           : const Text(
                               'Add manga',
                               style: TextStyle(
-                                fontWeight: FontWeight.bold,
+                                fontWeight:
+                                    FontWeight.bold,
                               ),
                             ),
                     ),
@@ -285,7 +298,9 @@ class _HomePageState extends State<HomePage> {
                       onPressed: isAdding
                           ? null
                           : () =>
-                              Navigator.pop(sheetContext),
+                              Navigator.pop(
+                                sheetContext,
+                              ),
                       child: const Text(
                         'Cancel',
                         style: TextStyle(
@@ -300,6 +315,15 @@ class _HomePageState extends State<HomePage> {
           },
         );
       },
+    );
+  }
+
+  void openSearch() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const MangaSearchPage(),
+      ),
     );
   }
 
@@ -337,6 +361,11 @@ class _HomePageState extends State<HomePage> {
         ),
         actions: [
           IconButton(
+            onPressed: openSearch,
+            icon: const Icon(Icons.search),
+            tooltip: 'Search',
+          ),
+          IconButton(
             onPressed: showAddMangaDialog,
             icon: const Icon(Icons.add),
             tooltip: 'Add manga',
@@ -353,7 +382,9 @@ class _HomePageState extends State<HomePage> {
           : SafeArea(
               child: Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16),
+                    const EdgeInsets.symmetric(
+                  horizontal: 16,
+                ),
                 child: Column(
                   crossAxisAlignment:
                       CrossAxisAlignment.start,
@@ -393,14 +424,16 @@ class _HomePageState extends State<HomePage> {
                     Expanded(
                       child: library.isEmpty
                           ? _EmptyLibrary(
-                              onAdd: showAddMangaDialog,
+                              onAdd:
+                                  showAddMangaDialog,
                             )
                           : mangas.isEmpty
                               ? const Center(
                                   child: Text(
                                     'No manga found.',
                                     style: TextStyle(
-                                      color: Colors.white54,
+                                      color:
+                                          Colors.white54,
                                     ),
                                   ),
                                 )
@@ -415,9 +448,11 @@ class _HomePageState extends State<HomePage> {
                                     crossAxisCount: 2,
                                     crossAxisSpacing: 14,
                                     mainAxisSpacing: 18,
-                                    childAspectRatio: 0.61,
+                                    childAspectRatio:
+                                        0.61,
                                   ),
-                                  itemCount: mangas.length,
+                                  itemCount:
+                                      mangas.length,
                                   itemBuilder:
                                       (context, index) {
                                     final manga =
@@ -432,13 +467,16 @@ class _HomePageState extends State<HomePage> {
                                             MaterialPageRoute(
                                               builder: (_) =>
                                                   MangaDetailPage(
-                                                manga: manga,
+                                                manga:
+                                                    manga,
                                               ),
                                             ),
                                           );
                                         },
                                         onRemove: () {
-                                          removeManga(manga);
+                                          removeManga(
+                                            manga,
+                                          );
                                         },
                                       ),
                                     );

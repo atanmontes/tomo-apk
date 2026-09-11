@@ -13,7 +13,8 @@ final http.Client tomoHttpClient = http.Client();
 
 Map<String, String> get tomoHeaders => const {
   'User-Agent': tomoUserAgent,
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept':
+      'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'en-US,en;q=0.9',
   'Referer': 'https://weebcentral.com/',
 };
@@ -21,7 +22,10 @@ Map<String, String> get tomoHeaders => const {
 class MangaService {
   Future<MangaItem> fetchManga(String url) async {
     final response = await tomoHttpClient
-        .get(Uri.parse(url), headers: tomoHeaders)
+        .get(
+          Uri.parse(url),
+          headers: tomoHeaders,
+        )
         .timeout(const Duration(seconds: 15));
 
     if (response.statusCode != 200) {
@@ -49,7 +53,9 @@ class MangaService {
       final imageUrl = src.isNotEmpty ? src : dataSrc;
 
       if (imageUrl.contains('temp.compsci88.com/cover')) {
-        cover = imageUrl;
+        cover = Uri.parse(
+          'https://weebcentral.com',
+        ).resolve(imageUrl).toString();
         break;
       }
     }
@@ -71,12 +77,154 @@ class MangaService {
     );
   }
 
+  Future<List<MangaItem>> searchManga(String query) async {
+    final text = query.trim();
+
+    if (text.isEmpty) {
+      return [];
+    }
+
+    final uri = Uri.https(
+      'weebcentral.com',
+      '/search/data',
+      {
+        'limit': '32',
+        'offset': '0',
+        'text': text,
+        'sort': 'Best Match',
+        'order': 'Ascending',
+        'official': 'Any',
+        'display_mode': 'Full Display',
+      },
+    );
+
+    final response = await tomoHttpClient
+        .get(
+          uri,
+          headers: tomoHeaders,
+        )
+        .timeout(const Duration(seconds: 15));
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'WeebCentral returned HTTP ${response.statusCode}.',
+      );
+    }
+
+    final document = parser.parse(response.body);
+
+    final results = <MangaItem>[];
+    final seen = <String>{};
+
+    // The search/data response returns the manga articles
+    // directly, without the #search-results wrapper.
+    final articles = document.querySelectorAll(
+      'body > article',
+    );
+
+    for (final article in articles) {
+      final link = article.querySelector(
+        'section:first-child a[href*="/series/"]',
+      );
+
+      if (link == null) {
+        continue;
+      }
+
+      final href = link.attributes['href'];
+
+      if (href == null || href.trim().isEmpty) {
+        continue;
+      }
+
+      final resultUrl = Uri.parse(
+        'https://weebcentral.com',
+      ).resolve(href).toString();
+
+      final resultUri = Uri.tryParse(resultUrl);
+
+      if (resultUri == null) {
+        continue;
+      }
+
+      final seriesIndex =
+          resultUri.pathSegments.indexOf('series');
+
+      if (seriesIndex < 0 ||
+          seriesIndex + 1 >= resultUri.pathSegments.length) {
+        continue;
+      }
+
+      final id =
+          resultUri.pathSegments[seriesIndex + 1];
+
+      if (!seen.add(id)) {
+        continue;
+      }
+
+      // The title is in the second section of each result.
+      final detailsSection = article.querySelector(
+        'section:nth-child(2)',
+      );
+
+      final titleElement = detailsSection?.querySelector(
+        'span.tooltip a.link',
+      );
+
+      String title = titleElement?.text
+              .replaceAll(RegExp(r'\s+'), ' ')
+              .trim() ??
+          '';
+
+      // Fallback: use the series URL's final segment if
+      // the title selector ever changes.
+      if (title.isEmpty) {
+        title = resultUri.pathSegments.last
+            .replaceAll('-', ' ')
+            .trim();
+      }
+
+      if (title.isEmpty) {
+        continue;
+      }
+
+      final imageElement = article.querySelector(
+        'section:first-child img',
+      );
+
+      final src =
+          imageElement?.attributes['src'] ??
+          imageElement?.attributes['data-src'] ??
+          '';
+
+      final cover = src.isEmpty
+          ? ''
+          : Uri.parse(
+              'https://weebcentral.com',
+            ).resolve(src).toString();
+
+      results.add(
+        MangaItem(
+          id: id,
+          title: title,
+          cover: cover,
+          url: 'https://weebcentral.com/series/$id',
+        ),
+      );
+    }
+
+    return results;
+  }
+
   Future<List<ChapterItem>> fetchChapters(String mangaId) async {
     final chaptersUrl =
         'https://weebcentral.com/series/$mangaId/full-chapter-list';
 
     final response = await tomoHttpClient
-        .get(Uri.parse(chaptersUrl), headers: tomoHeaders)
+        .get(
+          Uri.parse(chaptersUrl),
+          headers: tomoHeaders,
+        )
         .timeout(const Duration(seconds: 15));
 
     if (response.statusCode != 200) {
@@ -166,7 +314,9 @@ class MangaService {
     return found;
   }
 
-  Future<List<String>> fetchChapterImages(String chapterId) async {
+  Future<List<String>> fetchChapterImages(
+    String chapterId,
+  ) async {
     final url =
         'https://weebcentral.com/chapters/'
         '$chapterId'
@@ -175,7 +325,10 @@ class MangaService {
         '&reading_style=long_strip';
 
     final response = await tomoHttpClient
-        .get(Uri.parse(url), headers: tomoHeaders)
+        .get(
+          Uri.parse(url),
+          headers: tomoHeaders,
+        )
         .timeout(const Duration(seconds: 20));
 
     if (response.statusCode != 200) {
@@ -194,7 +347,9 @@ class MangaService {
           image.attributes['data-src'] ??
           '';
 
-      if (src.isEmpty) continue;
+      if (src.isEmpty) {
+        continue;
+      }
 
       final imageUrl = Uri.parse(
         'https://weebcentral.com',
