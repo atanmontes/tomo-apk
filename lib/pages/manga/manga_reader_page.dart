@@ -577,7 +577,7 @@ class _ReaderControls extends StatelessWidget {
               vertical: 7,
             ),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: tomoPink.withOpacity(0.05),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
@@ -587,7 +587,7 @@ class _ReaderControls extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: tomoPink,
               ),
             ),
           ),
@@ -624,7 +624,7 @@ class _ReaderNavButton extends StatelessWidget {
 
     return Material(
       color: enabled
-          ? Colors.white.withOpacity(0.06)
+          ? tomoPink.withOpacity(0.12)
           : Colors.transparent,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
@@ -639,7 +639,7 @@ class _ReaderNavButton extends StatelessWidget {
               icon,
               size: 30,
               color: enabled
-                  ? Colors.white
+                  ? tomoPink
                   : Colors.white12,
             ),
           ),
