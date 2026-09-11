@@ -196,38 +196,33 @@ class _MangaDetailPageState
                         CrossAxisAlignment.start,
                     children: [
                       Center(
-                        child: ClipRRect(
-                          borderRadius:
-                              BorderRadius.circular(18),
-                          child: manga.cover.isEmpty
-                              ? Container(
-                                  width: 180,
-                                  height: 260,
-                                  color: tomoCard,
-                                  child: const Icon(
-                                    Icons.menu_book,
-                                    size: 60,
-                                    color:
-                                        Colors.white24,
-                                  ),
-                                )
-                              : Image.network(
-                                  manga.cover,
-                                  width: 180,
-                                  height: 260,
-                                  fit: BoxFit.cover,
-                                  cacheWidth: (180 *
-                                          MediaQuery
-                                              .devicePixelRatioOf(
-                                            context,
-                                          ) *
-                                          1.15)
-                                      .round(),
-                                  filterQuality:
-                                      FilterQuality.low,
-                                  gaplessPlayback: true,
+                        child: manga.cover.isEmpty
+                            ? Container(
+                                width: 220,
+                                height: 320,
+                                color: tomoCard,
+                                child: const Icon(
+                                  Icons.menu_book,
+                                  size: 60,
+                                  color: Colors.white24,
                                 ),
-                        ),
+                              )
+                            : Image.network(
+                                manga.cover,
+                                width: 220,
+                                height: 320,
+                                fit: BoxFit.cover,
+                                cacheWidth: (220 *
+                                        MediaQuery
+                                            .devicePixelRatioOf(
+                                          context,
+                                        ) *
+                                        1.15)
+                                    .round(),
+                                filterQuality:
+                                    FilterQuality.low,
+                                gaplessPlayback: true,
+                              ),
                       ),
 
                       const SizedBox(height: 24),
