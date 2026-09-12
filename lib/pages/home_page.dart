@@ -76,7 +76,7 @@ class _HomeContentState extends State<_HomeContent> {
   Timer? _searchDebounce;
 
   final TextEditingController _searchController =
-    TextEditingController();
+      TextEditingController();
 
   final Set<String> _libraryBusyIds = <String>{};
 
@@ -396,6 +396,7 @@ class _HomeContentState extends State<_HomeContent> {
                                     onLibraryToggle: () {
                                       _toggleLibrary(manga);
                                     },
+                                    showAuthor: false,
                                   ),
                                 );
                               },

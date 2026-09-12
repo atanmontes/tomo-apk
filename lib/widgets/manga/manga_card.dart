@@ -9,6 +9,7 @@ class MangaCard extends StatelessWidget {
   final VoidCallback? onLibraryToggle;
   final bool isInLibrary;
   final bool libraryBusy;
+  final bool showAuthor;
 
   const MangaCard({
     super.key,
@@ -17,6 +18,7 @@ class MangaCard extends StatelessWidget {
     required this.onLibraryToggle,
     required this.isInLibrary,
     this.libraryBusy = false,
+    this.showAuthor = true,
   });
 
   String get _authorText {
@@ -92,16 +94,19 @@ class MangaCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Text(
-                        _authorText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white54,
-                          fontSize: 12.5,
-                          height: 1.1,
+                      if (showAuthor) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          _authorText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12.5,
+                            height: 1.1,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
