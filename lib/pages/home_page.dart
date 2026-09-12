@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/manga/manga.dart';
 import '../services/manga/manga_service.dart';
@@ -19,17 +21,10 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
-  final GlobalKey<LibraryPageState> _libraryKey =
-      GlobalKey<LibraryPageState>();
-
   void _onNavigationChanged(int index) {
     setState(() {
       _selectedIndex = index;
     });
-
-    if (index == 1) {
-      _libraryKey.currentState?.reload();
-    }
   }
 
   @override
@@ -38,9 +33,9 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: tomoBackground,
       body: IndexedStack(
         index: _selectedIndex,
-        children: [
-          const _HomeContent(),
-          LibraryPage(key: _libraryKey),
+        children: const [
+          _HomeContent(),
+          LibraryPage(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -73,13 +68,25 @@ class _HomeContent extends StatefulWidget {
 }
 
 class _HomeContentState extends State<_HomeContent> {
+  List<MangaItem> library = [];
   String search = '';
   List<MangaItem> searchResults = [];
   bool searching = false;
+
   Timer? _searchDebounce;
-  final TextEditingController _searchController = TextEditingController();
+
+  final TextEditingController _searchController =
+    TextEditingController();
+
+  final Set<String> _libraryBusyIds = <String>{};
 
   final MangaService _mangaService = MangaService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLibrary();
+  }
 
   void _onSearchChanged(String value) {
     setState(() {
@@ -130,20 +137,100 @@ class _HomeContentState extends State<_HomeContent> {
     }
   }
 
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
+  Future<void> _loadLibrary() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getString('tomo_library');
+
+    if (saved == null) {
+      return;
+    }
+
+    try {
+      final List<dynamic> data = jsonDecode(saved);
+
+      final loaded = data
+          .map(
+            (item) => MangaItem.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
+          .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        library = loaded;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _saveLibrary() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setString(
+      'tomo_library',
+      jsonEncode(
+        library.map((manga) => manga.toJson()).toList(),
+      ),
+    );
+  }
+
+  bool _isInLibrary(MangaItem manga) {
+    return library.any(
+      (item) => item.id == manga.id,
+    );
+  }
+
+  Future<void> _toggleLibrary(MangaItem manga) async {
+    if (_libraryBusyIds.contains(manga.id)) {
+      return;
+    }
+
+    setState(() {
+      _libraryBusyIds.add(manga.id);
+    });
+
+    try {
+      if (_isInLibrary(manga)) {
+        library.removeWhere(
+          (item) => item.id == manga.id,
+        );
+      } else {
+        final fullManga = await _mangaService.fetchManga(
+          manga.url,
+        );
+
+        library.insert(0, fullManga);
+      }
+
+      await _saveLibrary();
+    } catch (_) {
+      // Keep the current library unchanged if the request fails.
+    } finally {
+      if (!mounted) return;
+
+      setState(() {
+        _libraryBusyIds.remove(manga.id);
+      });
+    }
   }
 
   Future<void> _openManga(MangaItem manga) async {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => MangaDetailPage(manga: manga),
+        builder: (_) => MangaDetailPage(
+          manga: manga,
+        ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -152,14 +239,22 @@ class _HomeContentState extends State<_HomeContent> {
 
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        padding: const EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          0,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
+
             RichText(
               text: const TextSpan(
-                style: TextStyle(fontSize: 32),
+                style: TextStyle(
+                  fontSize: 32,
+                ),
                 children: [
                   TextSpan(
                     text: 'TOM',
@@ -180,7 +275,9 @@ class _HomeContentState extends State<_HomeContent> {
                 ],
               ),
             ),
+
             const SizedBox(height: 6),
+
             const Text(
               'Find your next manga',
               style: TextStyle(
@@ -188,7 +285,9 @@ class _HomeContentState extends State<_HomeContent> {
                 color: Colors.white54,
               ),
             ),
+
             const SizedBox(height: 18),
+
             TextField(
               controller: _searchController,
               onChanged: _onSearchChanged,
@@ -198,6 +297,9 @@ class _HomeContentState extends State<_HomeContent> {
               ),
               decoration: InputDecoration(
                 hintText: 'Search WeebCentral...',
+                hintStyle: const TextStyle(
+                  color: Colors.white38,
+                ),
                 prefixIcon: const Icon(
                   Icons.search,
                   color: Colors.white38,
@@ -206,14 +308,21 @@ class _HomeContentState extends State<_HomeContent> {
                 suffixIcon: search.isNotEmpty
                     ? IconButton(
                         onPressed: () {
+                          _searchDebounce?.cancel();
                           _searchController.clear();
-                          _onSearchChanged('');
+
+                          setState(() {
+                            search = '';
+                            searchResults = [];
+                            searching = false;
+                          });
                         },
                         icon: const Icon(
-                          Icons.close,
-                          color: Colors.white38,
-                          size: 19,
+                          Icons.close_rounded,
+                          color: Colors.white54,
+                          size: 20,
                         ),
+                        splashRadius: 20,
                       )
                     : null,
                 filled: true,
@@ -238,7 +347,9 @@ class _HomeContentState extends State<_HomeContent> {
                 ),
               ),
             ),
+
             const SizedBox(height: 20),
+
             Expanded(
               child: searching
                   ? const Center(
@@ -256,24 +367,35 @@ class _HomeContentState extends State<_HomeContent> {
                           ),
                         )
                       : hasSearch
-                          ? GridView.builder(
+                          ? ListView.separated(
                               cacheExtent: 500,
-                              padding: const EdgeInsets.only(bottom: 24),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 14,
-                                mainAxisSpacing: 18,
-                                childAspectRatio: 0.60,
+                              padding: const EdgeInsets.only(
+                                bottom: 24,
                               ),
                               itemCount: searchResults.length,
+                              separatorBuilder: (_, __) {
+                                return const SizedBox(
+                                  height: 10,
+                                );
+                              },
                               itemBuilder: (context, index) {
-                                final manga = searchResults[index];
+                                final manga =
+                                    searchResults[index];
 
                                 return RepaintBoundary(
                                   child: MangaCard(
                                     manga: manga,
-                                    onTap: () => _openManga(manga),
+                                    onTap: () {
+                                      _openManga(manga);
+                                    },
+                                    isInLibrary:
+                                        _isInLibrary(manga),
+                                    libraryBusy:
+                                        _libraryBusyIds
+                                            .contains(manga.id),
+                                    onLibraryToggle: () {
+                                      _toggleLibrary(manga);
+                                    },
                                   ),
                                 );
                               },
@@ -296,7 +418,9 @@ class _HomeEmptyState extends StatelessWidget {
       child: Transform.translate(
         offset: const Offset(0, -35),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 30,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [

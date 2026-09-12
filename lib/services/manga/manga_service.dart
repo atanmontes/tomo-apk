@@ -46,10 +46,6 @@ class MangaService {
         .toLowerCase()
         .replaceAll(':', '');
 
-    // WeebCentral places Author(s) and Tags(s) inside
-    // an <li> whose label is inside a <strong>.
-    // We only read links from that exact row so values
-    // from other metadata fields cannot leak into the result.
     for (final element in document.querySelectorAll('li')) {
       final strong = element.querySelector('strong');
 
@@ -75,7 +71,6 @@ class MangaService {
         return links;
       }
 
-      // Fallback for a value rendered without <a>.
       final spans = element
           .querySelectorAll('span')
           .map((span) => _clean(span.text))
@@ -89,7 +84,7 @@ class MangaService {
 
     return [];
   }
-
+  
   String _extractValueByLabel(
     Document document,
     String label,
@@ -535,51 +530,78 @@ class MangaService {
       }
 
       // --------------------------------------------------
+      // AUTHORS
+      // --------------------------------------------------
+
+      final authors = <String>[];
+
+      for (final element in article.querySelectorAll('li')) {
+        final strong = element.querySelector('strong');
+
+        if (strong == null) {
+          continue;
+        }
+
+        final label = _clean(strong.text)
+            .toLowerCase()
+            .replaceAll(':', '');
+
+        if (label != 'author(s)' &&
+            label != 'authors') {
+          continue;
+        }
+
+        final links = element
+            .querySelectorAll('a')
+            .map((link) => _clean(link.text))
+            .where((text) => text.isNotEmpty)
+            .toList();
+
+        for (final author in links) {
+          if (!authors.contains(author)) {
+            authors.add(author);
+          }
+        }
+
+        break;
+      }
+
+      // --------------------------------------------------
       // TAGS
       // --------------------------------------------------
 
       final tags = <String>[];
 
-      for (final element
-          in article.querySelectorAll('*')) {
-        final directText = element.nodes
-          .whereType<Text>()
-          .map((node) => node.data)
-          .join(' ');
+      for (final element in article.querySelectorAll('li')) {
+        final strong = element.querySelector('strong');
 
-        final text =
-            _clean(directText);
-
-        final lowerText =
-            text.toLowerCase();
-
-        if (!lowerText.startsWith(
-              'tag(s):',
-            ) &&
-            !lowerText.startsWith(
-              'tags(s):',
-            )) {
+        if (strong == null) {
           continue;
         }
 
-        for (final child
-            in element.children) {
-          if (child.localName != 'a') {
-            continue;
-          }
+        final label = _clean(strong.text)
+            .toLowerCase()
+            .replaceAll(':', '');
 
-          final value =
-              _clean(child.text);
+        if (label != 'tag(s)' &&
+            label != 'tags(s)' &&
+            label != 'tags') {
+          continue;
+        }
 
-          if (value.isNotEmpty &&
-              !tags.contains(value)) {
-            tags.add(value);
+        final links = element
+            .querySelectorAll('a')
+            .map((link) => _clean(link.text))
+            .where((text) => text.isNotEmpty)
+            .toList();
+
+        for (final tag in links) {
+          if (!tags.contains(tag)) {
+            tags.add(tag);
           }
         }
 
-        if (tags.isNotEmpty) {
-          break;
-        }
+        break;
       }
 
       // --------------------------------------------------
@@ -593,6 +615,7 @@ class MangaService {
           cover: cover,
           url:
               'https://weebcentral.com/series/$id',
+          authors: authors,
           tags: tags,
         ),
       );

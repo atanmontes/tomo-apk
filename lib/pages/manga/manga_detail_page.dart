@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,9 +27,6 @@ class _MangaDetailPageState
 
   MangaItem? _detailsManga;
 
-  bool _inLibrary = false;
-  bool _libraryBusy = false;
-
   bool loadingChapters = true;
   String? chapterError;
 
@@ -56,7 +51,6 @@ class _MangaDetailPageState
   void initState() {
     super.initState();
     _loadDetails();
-    _loadLibraryState();
     loadChapters();
     _loadProgress();
   }
@@ -75,148 +69,6 @@ class _MangaDetailPageState
     } catch (_) {
       // The detail page can continue using the manga
       // received from search/library if the metadata request fails.
-    }
-  }
-
-  Future<void> _loadLibraryState() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString('tomo_library');
-
-    if (saved == null) {
-      return;
-    }
-
-    try {
-      final List<dynamic> data = jsonDecode(saved);
-      final exists = data.any((item) {
-        return item is Map &&
-            item['id']?.toString() == widget.manga.id;
-      });
-
-      if (!mounted) return;
-
-      setState(() {
-        _inLibrary = exists;
-      });
-    } catch (_) {
-      // Ignore invalid old library data.
-    }
-  }
-
-  Future<void> _addToLibrary() async {
-    if (_inLibrary || _libraryBusy) {
-      return;
-    }
-
-    setState(() {
-      _libraryBusy = true;
-    });
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString('tomo_library');
-      final List<dynamic> data = saved == null
-          ? <dynamic>[]
-          : (jsonDecode(saved) as List<dynamic>);
-
-      final exists = data.any((item) {
-        return item is Map &&
-            item['id']?.toString() == widget.manga.id;
-      });
-
-      if (!exists) {
-        final mangaToSave = _detailsManga ?? widget.manga;
-        data.insert(0, mangaToSave.toJson());
-        await prefs.setString(
-          'tomo_library',
-          jsonEncode(data),
-        );
-      }
-
-      if (!mounted) return;
-
-      setState(() {
-        _inLibrary = true;
-        _libraryBusy = false;
-      });
-
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Manga added to your library.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _libraryBusy = false;
-      });
-
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Could not add the manga.'),
-          ),
-        );
-    }
-  }
-
-  Future<void> _removeFromLibrary() async {
-    if (!_inLibrary || _libraryBusy) {
-      return;
-    }
-
-    setState(() {
-      _libraryBusy = true;
-    });
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString('tomo_library');
-      final List<dynamic> data = saved == null
-          ? <dynamic>[]
-          : (jsonDecode(saved) as List<dynamic>);
-
-      data.removeWhere((item) {
-        return item is Map &&
-            item['id']?.toString() == widget.manga.id;
-      });
-
-      await prefs.setString('tomo_library', jsonEncode(data));
-
-      if (!mounted) return;
-
-      setState(() {
-        _inLibrary = false;
-        _libraryBusy = false;
-      });
-
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Manga removed from your library.'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-    } catch (_) {
-      if (!mounted) return;
-
-      setState(() {
-        _libraryBusy = false;
-      });
-
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('Could not remove the manga.'),
-          ),
-        );
     }
   }
 
@@ -344,69 +196,29 @@ class _MangaDetailPageState
                         CrossAxisAlignment.start,
                     children: [
                       Center(
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            manga.cover.isEmpty
-                                ? Container(
-                                    width: 260,
-                                    height: 380,
-                                    color: tomoCard,
-                                    child: const Icon(
-                                      Icons.menu_book,
-                                      size: 60,
-                                      color: Colors.white24,
-                                    ),
-                                  )
-                                : Image.network(
-                                    manga.cover,
-                                    width: 260,
-                                    height: 380,
-                                    fit: BoxFit.cover,
-                                    cacheWidth: (260 *
-                                            MediaQuery.devicePixelRatioOf(context) *
-                                            1.15)
-                                        .round(),
-                                    filterQuality: FilterQuality.low,
-                                    gaplessPlayback: true,
-                                  ),
-                            Positioned(
-                              top: 10,
-                              right: 10,
-                              child: Material(
-                                color: tomoPink,
-                                borderRadius: BorderRadius.circular(12),
-                                child: InkWell(
-                                  onTap: _libraryBusy
-                                      ? null
-                                      : (_inLibrary
-                                          ? _removeFromLibrary
-                                          : _addToLibrary),
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: SizedBox(
-                                    width: 48,
-                                    height: 48,
-                                    child: _libraryBusy
-                                        ? const Padding(
-                                            padding: EdgeInsets.all(13),
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2.2,
-                                              color: Colors.white,
-                                            ),
-                                          )
-                                        : Icon(
-                                            _inLibrary
-                                                ? Icons.close_rounded
-                                                : Icons.add_rounded,
-                                            color: Colors.white,
-                                            size: 27,
-                                          ),
-                                  ),
+                        child: manga.cover.isEmpty
+                            ? Container(
+                                width: 260,
+                                height: 380,
+                                color: tomoCard,
+                                child: const Icon(
+                                  Icons.menu_book,
+                                  size: 60,
+                                  color: Colors.white24,
                                 ),
+                              )
+                            : Image.network(
+                                manga.cover,
+                                width: 260,
+                                height: 380,
+                                fit: BoxFit.cover,
+                                cacheWidth: (260 *
+                                        MediaQuery.devicePixelRatioOf(context) *
+                                        1.15)
+                                    .round(),
+                                filterQuality: FilterQuality.low,
+                                gaplessPlayback: true,
                               ),
-                            ),
-                          ],
-                        ),
                       ),
 
                       const SizedBox(height: 24),

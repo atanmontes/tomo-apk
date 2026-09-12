@@ -3,30 +3,30 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/manga/manga.dart';
-import '../theme/tomo_theme.dart';
-import '../widgets/manga/manga_card.dart';
+import '../../models/manga/manga.dart';
+import '../../theme/tomo_theme.dart';
+import '../../widgets/manga/manga_card.dart';
 import 'manga/manga_detail_page.dart';
 
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
 
   @override
-  State<LibraryPage> createState() => LibraryPageState();
+  State<LibraryPage> createState() => _LibraryPageState();
 }
 
-class LibraryPageState extends State<LibraryPage> {
-  static const String libraryKey = 'tomo_library';
+class _LibraryPageState extends State<LibraryPage> {
+  final TextEditingController _searchController = TextEditingController();
 
   List<MangaItem> library = [];
-  bool loading = true;
   String search = '';
-  final TextEditingController _searchController = TextEditingController();
+
+  final Set<String> _libraryBusyIds = <String>{};
 
   @override
   void initState() {
     super.initState();
-    reload();
+    loadLibrary();
   }
 
   @override
@@ -35,29 +35,99 @@ class LibraryPageState extends State<LibraryPage> {
     super.dispose();
   }
 
-  Future<void> reload() async {
+  Future<void> loadLibrary() async {
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(libraryKey);
+    final raw = prefs.getString('tomo_library');
 
-    List<MangaItem> loaded = [];
+    if (raw == null || raw.isEmpty) {
+      if (!mounted) return;
 
-    if (saved != null) {
-      try {
-        final List<dynamic> data = jsonDecode(saved);
-        loaded = data
-            .map((item) => MangaItem.fromJson(item))
-            .toList();
-      } catch (_) {
-        loaded = [];
-      }
+      setState(() {
+        library = [];
+      });
+
+      return;
     }
 
-    if (!mounted) return;
+    try {
+      final decoded = jsonDecode(raw);
+
+      if (decoded is! List) {
+        return;
+      }
+
+      final loaded = decoded
+          .map(
+            (item) => MangaItem.fromJson(
+              Map<String, dynamic>.from(item as Map),
+            ),
+          )
+          .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        library = loaded;
+      });
+    } catch (_) {
+      if (!mounted) return;
+
+      setState(() {
+        library = [];
+      });
+    }
+  }
+
+  Future<void> _saveLibrary() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.setString(
+      'tomo_library',
+      jsonEncode(
+        library.map((manga) => manga.toJson()).toList(),
+      ),
+    );
+  }
+
+  Future<void> _toggleLibrary(MangaItem manga) async {
+    if (_libraryBusyIds.contains(manga.id)) {
+      return;
+    }
 
     setState(() {
-      library = loaded;
-      loading = false;
+      _libraryBusyIds.add(manga.id);
     });
+
+    try {
+      library.removeWhere(
+        (item) => item.id == manga.id,
+      );
+
+      await _saveLibrary();
+
+      if (!mounted) return;
+
+      setState(() {});
+    } finally {
+      if (!mounted) return;
+
+      setState(() {
+        _libraryBusyIds.remove(manga.id);
+      });
+    }
+  }
+
+  Future<void> _openManga(MangaItem manga) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MangaDetailPage(
+          manga: manga,
+        ),
+      ),
+    );
+
+    await loadLibrary();
   }
 
   List<MangaItem> get filteredLibrary {
@@ -68,59 +138,43 @@ class LibraryPageState extends State<LibraryPage> {
     }
 
     return library.where((manga) {
-      return manga.title.toLowerCase().contains(query);
+      final title = manga.title.toLowerCase();
+
+      final authors = manga.authors
+          .join(' ')
+          .toLowerCase();
+
+      return title.contains(query) ||
+          authors.contains(query);
     }).toList();
-  }
-
-  Future<void> _openManga(MangaItem manga) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => MangaDetailPage(manga: manga),
-      ),
-    );
-
-    await reload();
   }
 
   @override
   Widget build(BuildContext context) {
     final mangas = filteredLibrary;
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                const Text(
-                  'My Library',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (library.isNotEmpty) ...[
-                  const SizedBox(width: 10),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 3),
-                    child: Text(
-                      '${library.length} manga${library.length == 1 ? '' : 's'}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.white38,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+    return Scaffold(
+      backgroundColor: tomoBackground,
+      appBar: AppBar(
+        backgroundColor: tomoBackground,
+        elevation: 0,
+        title: const Text(
+          'My Library',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              12,
             ),
-            const SizedBox(height: 16),
-            TextField(
+            child: TextField(
               controller: _searchController,
               onChanged: (value) {
                 setState(() {
@@ -129,19 +183,21 @@ class LibraryPageState extends State<LibraryPage> {
               },
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 14,
               ),
               decoration: InputDecoration(
                 hintText: 'Search your library...',
-                prefixIcon: const Icon(
-                  Icons.search,
+                hintStyle: const TextStyle(
                   color: Colors.white38,
-                  size: 21,
+                ),
+                prefixIcon: const Icon(
+                  Icons.search_rounded,
+                  color: Colors.white54,
                 ),
                 suffixIcon: search.isNotEmpty
                     ? IconButton(
                         onPressed: () {
                           _searchController.clear();
+
                           setState(() {
                             search = '';
                           });
@@ -160,110 +216,86 @@ class LibraryPageState extends State<LibraryPage> {
                   borderRadius: BorderRadius.circular(14),
                   borderSide: BorderSide.none,
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(
-                    color: tomoPink,
-                    width: 1,
-                  ),
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 14,
-                ),
               ),
             ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: loading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: tomoPink,
-                      ),
-                    )
-                  : library.isEmpty
-                      ? const _EmptyLibrary()
-                      : mangas.isEmpty
-                          ? const Center(
-                              child: Text(
-                                'No manga found.',
-                                style: TextStyle(
-                                  color: Colors.white54,
-                                ),
-                              ),
-                            )
-                          : GridView.builder(
-                              cacheExtent: 500,
-                              padding: const EdgeInsets.only(bottom: 24),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 14,
-                                mainAxisSpacing: 18,
-                                childAspectRatio: 0.60,
-                              ),
-                              itemCount: mangas.length,
-                              itemBuilder: (context, index) {
-                                final manga = mangas[index];
-
-                                return RepaintBoundary(
-                                  child: MangaCard(
-                                    manga: manga,
-                                    onTap: () => _openManga(manga),
-                                  ),
-                                );
-                              },
-                            ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyLibrary extends StatelessWidget {
-  const _EmptyLibrary();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Transform.translate(
-        offset: const Offset(0, -55),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(
-                Icons.menu_book_outlined,
-                size: 64,
-                color: Colors.white24,
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Your library is empty',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text(
-                'Open a manga and tap the + button to save it here.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white54,
-                  height: 1.4,
-                ),
-              ),
-            ],
           ),
-        ),
+          Expanded(
+            child: mangas.isEmpty
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            library.isEmpty
+                                ? Icons.menu_book_rounded
+                                : Icons.search_off_rounded,
+                            size: 54,
+                            color: Colors.white24,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            library.isEmpty
+                                ? 'Your library is empty'
+                                : 'No manga found',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            library.isEmpty
+                                ? 'Search for a manga on Home and tap the + button to save it here.'
+                                : 'Try a different search.',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.white38,
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(
+                      16,
+                      4,
+                      16,
+                      24,
+                    ),
+                    cacheExtent: 500,
+                    itemCount: mangas.length,
+                    separatorBuilder: (_, __) {
+                      return const SizedBox(height: 10);
+                    },
+                    itemBuilder: (context, index) {
+                      final manga = mangas[index];
+
+                      return RepaintBoundary(
+                        child: MangaCard(
+                          manga: manga,
+                          onTap: () => _openManga(manga),
+                          onLibraryToggle: () {
+                            _toggleLibrary(manga);
+                          },
+                          isInLibrary: true,
+                          libraryBusy: _libraryBusyIds.contains(
+                            manga.id,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }
