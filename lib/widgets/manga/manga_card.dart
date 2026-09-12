@@ -34,9 +34,9 @@ class MangaCard extends StatelessWidget {
     return Material(
       color: tomoCard,
       borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
         child: SizedBox(
           height: 96,
           child: Row(
@@ -58,10 +58,13 @@ class MangaCard extends StatelessWidget {
                         width: 70,
                         height: 96,
                         fit: BoxFit.cover,
-                        cacheWidth: (140 *
-                                MediaQuery.devicePixelRatioOf(context) *
-                                1.15)
-                            .round(),
+                        cacheWidth:
+                            (140 *
+                                    MediaQuery.devicePixelRatioOf(
+                                      context,
+                                    ) *
+                                    1.15)
+                                .round(),
                         filterQuality: FilterQuality.low,
                         gaplessPlayback: true,
                         errorBuilder: (_, __, ___) {
@@ -78,10 +81,17 @@ class MangaCard extends StatelessWidget {
               ),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+                  padding: const EdgeInsets.fromLTRB(
+                    14,
+                    12,
+                    8,
+                    12,
+                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                    mainAxisAlignment:
+                        MainAxisAlignment.center,
                     children: [
                       Text(
                         manga.title,
@@ -93,7 +103,6 @@ class MangaCard extends StatelessWidget {
                           height: 1.15,
                         ),
                       ),
-                      const SizedBox(height: 6),
                       if (showAuthor) ...[
                         const SizedBox(height: 6),
                         Text(
@@ -117,7 +126,8 @@ class MangaCard extends StatelessWidget {
                   color: tomoPink,
                   borderRadius: BorderRadius.circular(12),
                   child: InkWell(
-                    onTap: libraryBusy ? null : onLibraryToggle,
+                    onTap:
+                        libraryBusy ? null : onLibraryToggle,
                     borderRadius: BorderRadius.circular(12),
                     child: SizedBox(
                       width: 44,
@@ -125,7 +135,8 @@ class MangaCard extends StatelessWidget {
                       child: libraryBusy
                           ? const Padding(
                               padding: EdgeInsets.all(12),
-                              child: CircularProgressIndicator(
+                              child:
+                                  CircularProgressIndicator(
                                 strokeWidth: 2.2,
                                 color: Colors.white,
                               ),

@@ -8,6 +8,12 @@ import '../../theme/tomo_theme.dart';
 import '../../widgets/manga/manga_card.dart';
 import 'manga/manga_detail_page.dart';
 
+enum _LibraryFilter {
+  all,
+  inProgress,
+  notStarted,
+}
+
 class LibraryPage extends StatefulWidget {
   const LibraryPage({super.key});
 
@@ -16,10 +22,13 @@ class LibraryPage extends StatefulWidget {
 }
 
 class _LibraryPageState extends State<LibraryPage> {
-  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _searchController =
+      TextEditingController();
 
   List<MangaItem> library = [];
+  Map<String, int> _readCounts = {};
   String search = '';
+  _LibraryFilter _filter = _LibraryFilter.all;
 
   final Set<String> _libraryBusyIds = <String>{};
 
@@ -44,8 +53,8 @@ class _LibraryPageState extends State<LibraryPage> {
 
       setState(() {
         library = [];
+        _readCounts = {};
       });
-
       return;
     }
 
@@ -64,16 +73,28 @@ class _LibraryPageState extends State<LibraryPage> {
           )
           .toList();
 
+      final counts = <String, int>{};
+
+      for (final manga in loaded) {
+        final saved = prefs.getStringList(
+          'tomo_read_${manga.id}',
+        );
+
+        counts[manga.id] = saved?.length ?? 0;
+      }
+
       if (!mounted) return;
 
       setState(() {
         library = loaded;
+        _readCounts = counts;
       });
     } catch (_) {
       if (!mounted) return;
 
       setState(() {
         library = [];
+        _readCounts = {};
       });
     }
   }
@@ -107,7 +128,9 @@ class _LibraryPageState extends State<LibraryPage> {
 
       if (!mounted) return;
 
-      setState(() {});
+      setState(() {
+        _readCounts.remove(manga.id);
+      });
     } finally {
       if (!mounted) return;
 
@@ -130,23 +153,60 @@ class _LibraryPageState extends State<LibraryPage> {
     await loadLibrary();
   }
 
+  bool _hasProgress(MangaItem manga) {
+    return (_readCounts[manga.id] ?? 0) > 0;
+  }
+
   List<MangaItem> get filteredLibrary {
     final query = search.trim().toLowerCase();
 
-    if (query.isEmpty) {
-      return library;
-    }
+    final result = library.where((manga) {
+      if (_filter == _LibraryFilter.inProgress &&
+          !_hasProgress(manga)) {
+        return false;
+      }
 
-    return library.where((manga) {
+      if (_filter == _LibraryFilter.notStarted &&
+          _hasProgress(manga)) {
+        return false;
+      }
+
+      if (query.isEmpty) {
+        return true;
+      }
+
       final title = manga.title.toLowerCase();
-
-      final authors = manga.authors
-          .join(' ')
-          .toLowerCase();
+      final authors = manga.authors.join(' ').toLowerCase();
 
       return title.contains(query) ||
           authors.contains(query);
     }).toList();
+
+    result.sort((a, b) {
+      final aProgress = _hasProgress(a);
+      final bProgress = _hasProgress(b);
+
+      if (aProgress != bProgress) {
+        return aProgress ? -1 : 1;
+      }
+
+      return a.title.toLowerCase().compareTo(
+            b.title.toLowerCase(),
+          );
+    });
+
+    return result;
+  }
+
+  String get _filterLabel {
+    switch (_filter) {
+      case _LibraryFilter.all:
+        return 'All';
+      case _LibraryFilter.inProgress:
+        return 'In Progress';
+      case _LibraryFilter.notStarted:
+        return 'Not Started';
+    }
   }
 
   @override
@@ -164,6 +224,36 @@ class _LibraryPageState extends State<LibraryPage> {
             fontWeight: FontWeight.w700,
           ),
         ),
+        actions: [
+          PopupMenuButton<_LibraryFilter>(
+            tooltip: 'Filter library',
+            icon: const Icon(
+              Icons.filter_list_rounded,
+              color: Colors.white70,
+            ),
+            color: tomoCard,
+            initialValue: _filter,
+            onSelected: (value) {
+              setState(() {
+                _filter = value;
+              });
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: _LibraryFilter.all,
+                child: Text('All'),
+              ),
+              PopupMenuItem(
+                value: _LibraryFilter.inProgress,
+                child: Text('In Progress'),
+              ),
+              PopupMenuItem(
+                value: _LibraryFilter.notStarted,
+                child: Text('Not Started'),
+              ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -172,51 +262,82 @@ class _LibraryPageState extends State<LibraryPage> {
               16,
               8,
               16,
-              12,
+              8,
             ),
-            child: TextField(
-              controller: _searchController,
-              onChanged: (value) {
-                setState(() {
-                  search = value;
-                });
-              },
-              style: const TextStyle(
-                color: Colors.white,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Search your library...',
-                hintStyle: const TextStyle(
-                  color: Colors.white38,
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) {
+                      setState(() {
+                        search = value;
+                      });
+                    },
+                    style: const TextStyle(
+                      color: Colors.white,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search your library...',
+                      hintStyle: const TextStyle(
+                        color: Colors.white38,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: Colors.white54,
+                      ),
+                      suffixIcon: search.isNotEmpty
+                          ? IconButton(
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  search = '';
+                                });
+                              },
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white54,
+                                size: 20,
+                              ),
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: tomoCard,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
                 ),
-                prefixIcon: const Icon(
-                  Icons.search_rounded,
-                  color: Colors.white54,
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              16,
+              0,
+              16,
+              8,
+            ),
+            child: Row(
+              children: [
+                Text(
+                  _filterLabel,
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 13,
+                  ),
                 ),
-                suffixIcon: search.isNotEmpty
-                    ? IconButton(
-                        onPressed: () {
-                          _searchController.clear();
-
-                          setState(() {
-                            search = '';
-                          });
-                        },
-                        icon: const Icon(
-                          Icons.close_rounded,
-                          color: Colors.white54,
-                          size: 20,
-                        ),
-                        splashRadius: 20,
-                      )
-                    : null,
-                filled: true,
-                fillColor: tomoCard,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
+                const Spacer(),
+                Text(
+                  '${mangas.length} manga',
+                  style: const TextStyle(
+                    color: Colors.white38,
+                    fontSize: 13,
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
           Expanded(
@@ -252,7 +373,7 @@ class _LibraryPageState extends State<LibraryPage> {
                           Text(
                             library.isEmpty
                                 ? 'Search for a manga on Home and tap the + button to save it here.'
-                                : 'Try a different search.',
+                                : 'Try a different search or filter.',
                             textAlign: TextAlign.center,
                             style: const TextStyle(
                               color: Colors.white38,
@@ -273,9 +394,8 @@ class _LibraryPageState extends State<LibraryPage> {
                     ),
                     cacheExtent: 500,
                     itemCount: mangas.length,
-                    separatorBuilder: (_, __) {
-                      return const SizedBox(height: 10);
-                    },
+                    separatorBuilder: (_, __) =>
+                        const SizedBox(height: 10),
                     itemBuilder: (context, index) {
                       final manga = mangas[index];
 
@@ -287,9 +407,8 @@ class _LibraryPageState extends State<LibraryPage> {
                             _toggleLibrary(manga);
                           },
                           isInLibrary: true,
-                          libraryBusy: _libraryBusyIds.contains(
-                            manga.id,
-                          ),
+                          libraryBusy:
+                              _libraryBusyIds.contains(manga.id),
                         ),
                       );
                     },
